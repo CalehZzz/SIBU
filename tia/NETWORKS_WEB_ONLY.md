@@ -1,15 +1,15 @@
-# Networks — solo Web · 3 materiales (plástico / latas / vidrio)
+# Networks — solo Web · 3 materiales (doble efecto biestable)
 
 **Regla:** sensores + operador = `DB_HMI.*`.  
-Actuadores = `M_Banda`, `M_Piston1` (plástico), `M_Piston2` (latas/aluminio), `M_Piston3` (vidrio).
+Comando = `M_Piston1/2/3` · solenoides sim = `M_PistonNExt` / `M_PistonNRet`.
 
-Cilindros **simple efecto** · 1 FC `PistonNExtendido` por pistón.
+Cilindros **doble efecto** · 5/2 biestable (Ext + Ret) · FC `PistonNExtendido` (100 %) y `PistonNRetractado` (0 %).
 
 ```
   [Sim] → báscula → banda → sensores material
-                              ├─ plástico → P1
-                              ├─ latas    → P2
-                              └─ vidrio   → P3
+                              ├─ plástico → P1 Ext/Ret
+                              ├─ latas    → P2 Ext/Ret
+                              └─ vidrio   → P3 Ext/Ret
 ```
 
 ---
@@ -33,6 +33,9 @@ Cilindros **simple efecto** · 1 FC `PistonNExtendido` por pistón.
           ├──(R) M_SistemaOn
 [ Emerg ]─┘
 [ DB_HMI.ModoAuto ]──( ) M_ModoAuto
+[ M_SistemaOn ]──[/ Emergencia ]──( ) M_LamparaRun
+[ M_Alarma ]──( ) M_LamparaAlarma
+[ Emergencia ]──( ) M_LamparaEmergencia
 ```
 
 ---
@@ -63,25 +66,23 @@ On · Auto · Pieza · Bascula · SensorVidrio
 · /SensorPlastico · /SensorAluminio · /ClasifPlastico · /ClasifAluminio → (S) M_ClasifVidrio
 ```
 
-### P1 plástico → `M_Piston1`
+### Comando P1/P2/P3 → `M_PistonN`
 ```
-[ ClasifPlastico ]─[/ Piston1Extendido ]─┐
-                                         ├──( ) M_Piston1
-[ On ]─[/ Auto ]─[ ManualPiston1 ]───────┘
-```
-
-### P2 latas → `M_Piston2`
-```
-[ ClasifAluminio ]─[/ Piston2Extendido ]─┐
-                                         ├──( ) M_Piston2
-[ On ]─[/ Auto ]─[ ManualPiston2 ]───────┘
+[ ClasifX ]─[/ PistonNExtendido ]─┐
+                                  ├──( ) M_PistonN
+[ On ]─[/ Auto ]─[ Manual… ]──────┘
 ```
 
-### P3 vidrio → `M_Piston3`
+| Pistón | Auto | Manual |
+|---|---|---|
+| P1 | `M_ClasifPlastico` | `ManualPiston1` |
+| P2 | `M_ClasifAluminio` | `ManualPiston2` |
+| P3 | `M_ClasifVidrio` | `ManualPiston` |
+
+### Solenoides Ext / Ret
 ```
-[ ClasifVidrio ]─[/ Piston3Extendido ]─┐
-                                       ├──( ) M_Piston3
-[ On ]─[/ Auto ]─[ ManualPiston ]──────┘
+[ M_PistonN ]─[/ PistonNExtendido ]─[/ M_PistonNRet ]──( ) M_PistonNExt
+[/ M_PistonN ]─[/ PistonNRetractado ]─[/ M_PistonNExt ]──( ) M_PistonNRet
 ```
 
 ### Retardo + contar (cada material)
@@ -99,6 +100,14 @@ ClasifX · TON Timeout → /PistonNExtendido → (S) M_Alarma
 
 ```
 M_Clasificando := ClasifPlastico OR ClasifAluminio OR ClasifVidrio;
+```
+
+---
+
+## FC_Alarmas (extra)
+
+```
+PistonNExtendido · PistonNRetractado → (S) M_Alarma
 ```
 
 ---

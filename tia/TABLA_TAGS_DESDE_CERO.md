@@ -41,15 +41,21 @@ Página SIBU / HMI virtual (KTP700)
 | `M_ClasifAluminio` | `%M0.4` | Secuencia empuje P3 |
 | `M_Clasificando` | `%M0.7` | OR de clasif (para banda / P1) |
 | `M_Banda` | `%M3.0` | Actuador banda (sim) |
-| `M_Piston1` | `%M3.1` | Retenedor |
-| `M_Piston2` | `%M3.2` | Empuje plástico |
-| `M_Piston3` | `%M3.3` | Empuje aluminio |
+| `M_Piston1` | `%M3.1` | Comando P1 (deseo extendido) |
+| `M_Piston2` | `%M3.2` | Comando P2 |
+| `M_Piston3` | `%M3.3` | Comando P3 |
 | `M_LamparaRun` | `%M3.4` | Piloto run (opc.) |
 | `M_LamparaAlarma` | `%M3.5` | Piloto alarma |
 | `M_LamparaEmergencia` | `%M3.6` | Piloto emergencia |
+| `M_Piston1Ext` | `%M4.0` | Solenoide A P1 (sim) |
+| `M_Piston1Ret` | `%M4.1` | Solenoide B P1 (sim) |
+| `M_Piston2Ext` | `%M4.2` | Solenoide A P2 (sim) |
+| `M_Piston2Ret` | `%M4.3` | Solenoide B P2 (sim) |
+| `M_Piston3Ext` | `%M4.4` | Solenoide A P3 (sim) |
+| `M_Piston3Ret` | `%M4.5` | Solenoide B P3 (sim) |
 
-> Cilindros **simple efecto**: energizar `M_PistonN` = extender; al apagar, el resorte retracta.  
-> Un sensor simulado por pistón: `DB_HMI.PistonNExtendido`.
+> Cilindros **doble efecto** (5/2 biestable): `M_PistonN` = comando; `M_PistonNExt`/`Ret` = solenoides.  
+> FC sim: `DB_HMI.PistonNExtendido` (100 %) y `DB_HMI.PistonNRetractado` (0 %).
 
 ---
 
@@ -62,12 +68,16 @@ Página SIBU / HMI virtual (KTP700)
 | `SensorPieza` | Bool | 1.1 | Sim pieza |
 | `SensorPlastico` | Bool | 1.2 | Sim plástico |
 | `SensorAluminio` | Bool | 1.3 | Sim aluminio |
-| `Piston1Extendido` | Bool | 1.4 | Sim FC P1 |
-| `Piston2Extendido` | Bool | 1.5 | Sim FC P2 |
+| `Piston1Extendido` | Bool | 1.4 | Sim FC P1 **100 %** |
+| `Piston2Extendido` | Bool | 1.5 | Sim FC P2 **100 %** |
 | `ManualPiston1` | Bool | 1.6 | Manual P1 |
 | `ManualPiston2` | Bool | 1.7 | Manual P2 |
 | `PesoActualKg` | Real | **2.0** | Peso |
-| `Piston3Extendido` | Bool | **6.0** | Sim FC P3 |
+| `Piston3Extendido` | Bool | **6.0** | Sim FC P3 **100 %** |
+| `SensorVidrio` | Bool | **6.1** | Sim vidrio |
+| `Piston1Retractado` | Bool | **6.2** | Sim FC P1 **0 %** |
+| `Piston2Retractado` | Bool | **6.3** | Sim FC P2 **0 %** |
+| `Piston3Retractado` | Bool | **6.4** | Sim FC P3 **0 %** |
 
 Detalle completo: `tia/MAPA_DB_HMI.md`.
 
@@ -119,7 +129,7 @@ HMI virtual (3× Extender/Retractar + sim sensores)
    plc_bridge.py
         ↓  DB_HMI
    FC_Modos / FC_Secuencia / FC_Alarmas
-        ↓  M_Banda · M_Piston1 · M_Piston2 · M_Piston3
+        ↓  M_Banda · M_Piston1/2/3 · M_PistonNExt/Ret
    FC_EspejoWeb → DatosEstacion → sesiones_activas → web
 ```
 
@@ -128,7 +138,7 @@ HMI virtual (3× Extender/Retractar + sim sensores)
 ## Checklist TIA (sim)
 
 1. Crear `DB_HMI` (DB3) y `DatosEstacion` (DB1) con offsets de arriba · Optimized **OFF**
-2. Tags `%M` de los 3 pistones + latches
+2. Tags `%M` de los 3 comandos + 6 solenoides Ext/Ret + latches
 3. Programar networks de `NETWORKS_WEB_ONLY.md`
 4. Download a PLCSIM Advanced · PUT/GET ON
 5. Bridge: `py plc_bridge.py parque-central --ip 192.168.0.1 --db 1 --db-hmi 3`

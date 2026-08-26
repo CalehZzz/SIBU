@@ -3,11 +3,11 @@
 Copia estos nombres **exactamente** en TIA Portal (PLC tags + DB). Así el bridge Python y la web coinciden.
 
 > **Simulación (solo HMI):** operador + sensores → **`DB_HMI`**.  
-> Actuadores → **`M_Banda` / `M_Piston1` (plástico) / `M_Piston2` (latas) / `M_Piston3` (vidrio)**.  
+> Actuadores → **`M_Banda` / `M_PistonN` (comando) / `M_PistonNExt`·`Ret`**.  
 > Guía: `tia/NETWORKS_WEB_ONLY.md` · `docs/11_SIN_AS_SOLO_WEB.md`.
 
 ```
-  [Sim] → báscula → banda → P1 plástico | P2 latas | P3 vidrio
+  [Sim] → báscula → banda → P1 plástico | P2 latas | P3 vidrio  (Ext/Ret c/u)
 ```
 
 ---
@@ -19,9 +19,9 @@ En el modo **web-only** el operador **no** usa estas `%I`. Se dejan documentadas
 | Dirección | Nombre simbólico | Tipo | Descripción |
 |---|---|---|---|
 | — | *(sin botonera)* | — | Start/Stop/Emergencia/Manual → `DB_HMI` |
-| — | Sensores proceso | — | `DB_HMI.Sensor*` / `DB_HMI.PistonNExtendido` |
+| — | Sensores sim | — | `DB_HMI.Sensor*` / Ext 100 % / Ret 0 % |
 
-Para el **PLC real 1214C** ver `plc_real/TABLA_IO_1214C.md` (7 DI proceso + 7 DQ).
+Para el **PLC real 1214C** ver `plc_real/TABLA_IO_1214C.md` (**11 DI** + **10 DQ**, comunes 24 V + relés 220 V).
 
 ---
 
@@ -30,12 +30,15 @@ Para el **PLC real 1214C** ver `plc_real/TABLA_IO_1214C.md` (7 DI proceso + 7 DQ
 | Nombre | Ejemplo | Descripción |
 |---|---|---|
 | `M_Banda` | `%M3.0` | Marcha banda |
-| `M_Piston1` | `%M3.1` | Empuje plástico |
-| `M_Piston2` | `%M3.2` | Empuje latas |
-| `M_Piston3` | `%M3.3` | Empuje vidrio |
+| `M_Piston1` | `%M3.1` | Comando P1 (deseo extendido) |
+| `M_Piston2` | `%M3.2` | Comando P2 |
+| `M_Piston3` | `%M3.3` | Comando P3 |
 | `M_LamparaRun` | `%M3.4` | Piloto marcha |
 | `M_LamparaAlarma` | `%M3.5` | Piloto alarma |
 | `M_LamparaEmergencia` | `%M3.6` | Piloto emergencia |
+| `M_Piston1Ext` / `Ret` | `%M4.0` / `%M4.1` | Solenoides P1 |
+| `M_Piston2Ext` / `Ret` | `%M4.2` / `%M4.3` | Solenoides P2 |
+| `M_Piston3Ext` / `Ret` | `%M4.4` / `%M4.5` | Solenoides P3 |
 
 ---
 
@@ -46,11 +49,11 @@ Para el **PLC real 1214C** ver `plc_real/TABLA_IO_1214C.md` (7 DI proceso + 7 DQ
 | `M_SistemaOn` | Bool | `%M0.0` | Latch de sistema energizado |
 | `M_ModoAuto` | Bool | `%M0.1` | Copia del modo (DB_HMI) |
 | `M_Alarma` | Bool | `%M0.2` | Alarma activa |
-| `M_ClasifPlastico` | Bool | `%M0.3` | Secuencia P2 |
-| `M_ClasifAluminio` | Bool | `%M0.4` | Secuencia P3 |
-| `M_Clasificando` | Bool | `%M0.7` | OR clasif (banda / P1) |
-| `T_RetardoPiston2` / `T_RetardoPiston3` | TON IEC | auto | Espera extendido antes de contar |
-| `T_TimeoutPiston2` / `T_TimeoutPiston3` | TON IEC | auto | Alarma si no llega a 100% |
+| `M_ClasifPlastico` | Bool | `%M0.3` | Secuencia P1 |
+| `M_ClasifAluminio` | Bool | `%M0.4` | Secuencia P2 |
+| `M_Clasificando` | Bool | `%M0.7` | OR clasif (banda) |
+| `T_RetardoPiston1/2/3` | TON IEC | auto | Espera extendido antes de contar |
+| `T_TimeoutPiston1/2/3` | TON IEC | auto | Alarma si no llega a 100% |
 
 > Inserta el bloque **TON** y nombra la instancia (`T_RetardoPiston2`…). Contactos: `T_RetardoPiston2.Q`.  
 > Networks: `tia/NETWORKS_WEB_ONLY.md`.

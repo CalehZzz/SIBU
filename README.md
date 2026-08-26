@@ -33,8 +33,8 @@ python plc_real/plc_bridge_real.py --ip 192.168.0.10
 ```
 
 Estación Firestore: `colegio-don-bosco-real`.  
-Hardware: **3 pistones** — P1 plástico · P2 latas · P3 vidrio.  
-Operador: **solo web** — ver `plc_real/TABLA_IO_1214C.md`.
+Hardware: **3 pistones doble efecto** — 6 solenoides Ext/Ret · P1 plástico · P2 latas · P3 vidrio.  
+Semáforo vía relés (`1L`/`2L` = 24 V). Operador: **solo web** — ver `plc_real/TABLA_IO_1214C.md`.
 
 ## App
 

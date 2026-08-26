@@ -1,19 +1,20 @@
-# Sin AS — solo Web ↔ TIA (plástico / latas / vidrio)
+# Sin AS — solo Web ↔ TIA (plástico / latas / vidrio · doble efecto)
 
 ```
 Estación (app) → Abrir HMI
         ↕ Firestore
    plc_bridge.py
         ↕
-   PLC 1511C (PLCSIM) · M_Piston1/2/3
+   PLC 1511C (PLCSIM) · M_PistonN + Ext/Ret
 ```
 
-| Pistón | Material |
-|---|---|
-| P1 | Plástico |
-| P2 | Latas (aluminio) |
-| P3 | Vidrio |
+| Pistón | Material | Solenoides sim |
+|---|---|---|
+| P1 | Plástico | `M_Piston1Ext` / `M_Piston1Ret` |
+| P2 | Latas (aluminio) | `M_Piston2Ext` / `M_Piston2Ret` |
+| P3 | Vidrio | `M_Piston3Ext` / `M_Piston3Ret` |
 
+FC sim: `PistonNExtendido` (100 %) + `PistonNRetractado` (0 %).  
 Tags: `tia/TABLA_TAGS_DESDE_CERO.md` · Networks: `tia/NETWORKS_WEB_ONLY.md` · DB: `tia/MAPA_DB_HMI.md`
 
 HMI **solo** desde la vista de estación (no hay icono en la barra superior).
@@ -22,3 +23,5 @@ Bridge:
 ```powershell
 py plc_bridge.py parque-central --ip 192.168.0.1 --db 1 --db-hmi 3
 ```
+
+PLC real (6 Q solenoides + relés 220 V): `plc_real/TABLA_IO_1214C.md`.

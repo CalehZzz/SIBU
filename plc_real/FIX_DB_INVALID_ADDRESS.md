@@ -40,8 +40,11 @@ Si salen otros números, el bridge puede usar `--db N --db-hmi M`.
 | 0.0–0.7 | Start … ManualPiston | Bool |
 | 1.0–1.7 | BasculaLista … ManualPiston2 | Bool |
 | **2.0** | **PesoActualKg** | **Real** |
-| **6.0** | **Piston3Extendido** | Bool |
+| **6.0** | **Piston3Extendido** | Bool (FC 100 %) |
 | **6.1** | **SensorVidrio** | Bool |
+| **6.2** | **Piston1Retractado** | Bool (FC 0 %) |
+| **6.3** | **Piston2Retractado** | Bool |
+| **6.4** | **Piston3Retractado** | Bool |
 
 3. El tamaño del DB debe ser **≥ 7 bytes** (TIA lo calcula al compilar).
 4. **Download** software a la CPU / instancia correcta → CPU **RUN**.
