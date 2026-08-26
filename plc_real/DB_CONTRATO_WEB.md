@@ -37,8 +37,11 @@ DatosEstacion.PistonOn  := Q_Piston1 OR Q_Piston2 OR Q_Piston3;
 |---|---|---|
 | 0.0–0.7 | Start…ManualPiston | ManualPiston = **P3 vidrio** |
 | 1.0–1.3 | BasculaLista · SensorPieza · SensorPlastico · SensorAluminio | Sim / real ignora → `I_*` |
-| 1.4–1.5 | Piston1Extendido · Piston2Extendido | Sim FC |
+| 1.4–1.5 | Piston1Extendido · Piston2Extendido | Sim FC @ 100% |
 | 1.6–1.7 | ManualPiston1 · ManualPiston2 | P1 plástico · P2 latas |
 | 2.0 | PesoActualKg | Real |
-| 6.0 | Piston3Extendido | Sim FC P3 |
+| 6.0 | Piston3Extendido | Sim FC P3 @ 100% |
 | 6.1 | SensorVidrio | Sim vidrio · real → `I_SensorVidrio` |
+| 6.2–6.4 | Piston1/2/3Retractado | Sim FC @ 0% (doble efecto) |
+
+Cilindros **doble efecto** · en reposo `*Retractado = 1`.

@@ -5,15 +5,15 @@
 - [ ] IP estática anotada (ej. `192.168.0.10`)
 - [ ] PUT/GET habilitado + download hardware
 - [ ] `DatosEstacion` DB1 Optimized OFF · **≥ 28 bytes** (`ContVidrio` @22 · `PesoVidrioKg` @24 · `Piston1/2/3On` @17.0–17.2)
-- [ ] `DB_HMI` DB3 Optimized OFF · **≥ 7 bytes** (`PesoActualKg` Real @2.0 · `Piston3Extendido` @6.0 · `SensorVidrio` @6.1)
-- [ ] Tag table según `TABLA_IO_1214C.md` (**Q_Piston1..3** + 6 sensores de posición)
+- [ ] `DB_HMI` DB3 Optimized OFF · **≥ 7 bytes** (`PesoActualKg` @2.0 · Extendido/Retractado @6.x · `SensorVidrio` @6.1)
+- [ ] Tag table según `TABLA_IO_1214C.md` (**Q_Piston1..3** 5/2 + **6** FC posición 0%/100%)
 - [ ] FCs según `NETWORKS_LAD.md`
 - [ ] Timers: `T_RetardoPiston2/3`, `T_TimeoutPiston2/3`
 - [ ] Download software + CPU RUN
 - [ ] Online: forzando `Q_Banda` / `Q_Piston1` / `Q_Piston2` / `Q_Piston3` se oye/ve cada actuador
 - [ ] `DB_HMI` tiene `ManualPiston1` @1.6 · `ManualPiston2` @1.7 · `ManualPiston` @0.7 (Optimized OFF)
 - [ ] LAD P1–P3: rama MANUAL = `M_SistemaOn` · `/M_ModoAuto` · `DB_HMI.Manual…`
-- [ ] Prueba HMI: START → AUTO off → **Extender** P1 (no solo Retractar: retractar = Q OFF)
+- [ ] Prueba HMI: START → AUTO off → **Extender** P1 (Q ON) → **Retractar** (Q OFF; aire mete el vástago)
 
 ## Mesa real (sin botonera)
 - [ ] **Sin** pulsadores Start/Stop/Emergencia/Manual — todo desde HMI web

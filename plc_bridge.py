@@ -29,7 +29,7 @@ except ImportError:
 SERVICE_ACCOUNT_PATH = "serviceAccountKey.json"
 # DatosEstacion termina en ContVidrio@22 + PesoVidrioKg@24 → 28 bytes.
 DB_READ_SIZE = 28
-# DB_HMI: bools 0..1 + Real PesoActualKg @ 2.0 + Piston3Extendido@6.0 + SensorVidrio@6.1 → 7 bytes.
+# DB_HMI: bools 0..1 + Real @2.0 + Extendido/Retractado/SensorVidrio @6.x → 7 bytes.
 DB_HMI_SIZE = 7
 PESO_OFFSET = 2  # si tu DB_HMI muestra otro offset al compilar, cámbialo aquí
 
@@ -82,8 +82,11 @@ BOOL_MAP = [
     ("Piston2Extendido", 1, 5),   # sim FC P2 latas
     ("ManualPiston1", 1, 6),      # manual P1 plástico
     ("ManualPiston2", 1, 7),      # manual P2 latas
-    ("Piston3Extendido", 6, 0),   # sim FC P3 vidrio
+    ("Piston3Extendido", 6, 0),   # sim FC P3 @ 100%
     ("SensorVidrio", 6, 1),       # sim sensor vidrio
+    ("Piston1Retractado", 6, 2),  # sim FC P1 @ 0%
+    ("Piston2Retractado", 6, 3),  # sim FC P2 @ 0%
+    ("Piston3Retractado", 6, 4),  # sim FC P3 @ 0%
 ]
 
 
@@ -182,7 +185,7 @@ def diagnostico_dbs(client: snap7.client.Client, db_datos: int, db_hmi: int) -> 
             print(f"  DB{dbn} ({label}): parcial — solo {max_ok} bytes (necesitas {need})")
             print("  → El DB es demasiado pequeño: agrega todos los campos y vuelve a descargar.")
             if label == "DB_HMI":
-                print("  → Campos: PesoActualKg Real @2.0 + Piston3Extendido @6.0 + SensorVidrio @6.1")
+                print("  → Campos: PesoActualKg @2.0 + Ext/Ret @6.x + SensorVidrio @6.1")
             else:
                 print("  → Campos: ContVidrio Int @22 + PesoVidrioKg Real @24 (total 28 B)")
         else:
@@ -272,7 +275,7 @@ def escribir_db_hmi(client: snap7.client.Client, db_hmi: int, cmd: dict) -> None
                     "hmi_parcial",
                     f"⚠️  DB_HMI (DB{db_hmi}) solo admite escritura de {sz} B "
                     f"(ideal {DB_HMI_SIZE}). En TIA agrega PesoActualKg Real @2.0 + "
-                    "Piston3Extendido @6.0 + SensorVidrio @6.1 → Download. "
+                    "Ext/Ret @6.x + SensorVidrio @6.1 → Download. "
                     f"Mientras tanto se escriben {sz} bytes. "
                     "Ver plc_real/FIX_DB_INVALID_ADDRESS.md",
                 )

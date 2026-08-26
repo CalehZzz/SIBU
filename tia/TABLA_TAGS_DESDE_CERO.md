@@ -48,8 +48,8 @@ Página SIBU / HMI virtual (KTP700)
 | `M_LamparaAlarma` | `%M3.5` | Piloto alarma |
 | `M_LamparaEmergencia` | `%M3.6` | Piloto emergencia |
 
-> Cilindros **simple efecto**: energizar `M_PistonN` = extender; al apagar, el resorte retracta.  
-> Un sensor simulado por pistón: `DB_HMI.PistonNExtendido`.
+> Cilindros **doble efecto** (5/2 monoestable): energizar `M_PistonN` = extender con aire; al apagar, aire retracta.  
+> Dos sensores simulados por pistón: `DB_HMI.PistonNExtendido` (100%) · `DB_HMI.PistonNRetractado` (0%).
 
 ---
 
@@ -62,12 +62,16 @@ Página SIBU / HMI virtual (KTP700)
 | `SensorPieza` | Bool | 1.1 | Sim pieza |
 | `SensorPlastico` | Bool | 1.2 | Sim plástico |
 | `SensorAluminio` | Bool | 1.3 | Sim aluminio |
-| `Piston1Extendido` | Bool | 1.4 | Sim FC P1 |
-| `Piston2Extendido` | Bool | 1.5 | Sim FC P2 |
+| `Piston1Extendido` | Bool | 1.4 | Sim FC P1 @ 100% |
+| `Piston2Extendido` | Bool | 1.5 | Sim FC P2 @ 100% |
 | `ManualPiston1` | Bool | 1.6 | Manual P1 |
 | `ManualPiston2` | Bool | 1.7 | Manual P2 |
 | `PesoActualKg` | Real | **2.0** | Peso |
-| `Piston3Extendido` | Bool | **6.0** | Sim FC P3 |
+| `Piston3Extendido` | Bool | **6.0** | Sim FC P3 @ 100% |
+| `SensorVidrio` | Bool | **6.1** | Sim vidrio |
+| `Piston1Retractado` | Bool | **6.2** | Sim FC P1 @ 0% |
+| `Piston2Retractado` | Bool | **6.3** | Sim FC P2 @ 0% |
+| `Piston3Retractado` | Bool | **6.4** | Sim FC P3 @ 0% |
 
 Detalle completo: `tia/MAPA_DB_HMI.md`.
 

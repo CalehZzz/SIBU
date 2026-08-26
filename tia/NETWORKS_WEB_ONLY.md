@@ -3,7 +3,7 @@
 **Regla:** sensores + operador = `DB_HMI.*`.  
 Actuadores = `M_Banda`, `M_Piston1` (plástico), `M_Piston2` (latas/aluminio), `M_Piston3` (vidrio).
 
-Cilindros **simple efecto** · 1 FC `PistonNExtendido` por pistón.
+Cilindros **doble efecto** · 5/2 monoestable · FC `PistonNExtendido` (100%) + `PistonNRetractado` (0%) por pistón.
 
 ```
   [Sim] → báscula → banda → sensores material
@@ -84,6 +84,9 @@ On · Auto · Pieza · Bascula · SensorVidrio
 [ On ]─[/ Auto ]─[ ManualPiston ]──────┘
 ```
 
+`M_PistonN = 1` → simula solenoide 5/2 (extiende).  
+`M_PistonN = 0` → válvula en reposo (aire retracta). Casa = `PistonNRetractado`.
+
 ### Retardo + contar (cada material)
 ```
 ClasifPlastico · Piston1Extendido → TON T_RetardoPiston1 → (R) Clasif + ContPlastico++
@@ -99,6 +102,14 @@ ClasifX · TON Timeout → /PistonNExtendido → (S) M_Alarma
 
 ```
 M_Clasificando := ClasifPlastico OR ClasifAluminio OR ClasifVidrio;
+```
+
+---
+
+## FC_Alarmas
+
+```
+PistonNExtendido · PistonNRetractado → (S) M_Alarma   // N = 1..3
 ```
 
 ---

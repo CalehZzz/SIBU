@@ -19,9 +19,9 @@ En el modo **web-only** el operador **no** usa estas `%I`. Se dejan documentadas
 | Dirección | Nombre simbólico | Tipo | Descripción |
 |---|---|---|---|
 | — | *(sin botonera)* | — | Start/Stop/Emergencia/Manual → `DB_HMI` |
-| — | Sensores proceso | — | `DB_HMI.Sensor*` / `DB_HMI.PistonNExtendido` |
+| — | Sensores estación | — | `DB_HMI.Sensor*` / `PistonNExtendido` / `PistonNRetractado` |
 
-Para el **PLC real 1214C** ver `plc_real/TABLA_IO_1214C.md` (7 DI proceso + 7 DQ).
+Para el **PLC real 1214C** ver `plc_real/TABLA_IO_1214C.md` (11 DI proceso + 7 DQ · doble efecto).
 
 ---
 

@@ -1487,13 +1487,16 @@
                       <button class="sp-btn sp-btn-fn" id="hmi-sim-aluminio">Latas</button>
                       <button class="sp-btn sp-btn-fn" id="hmi-sim-vidrio">Vidrio</button>
                       <button class="sp-btn sp-btn-fn" id="hmi-sim-clear">Limpiar</button>
-                      <button class="sp-btn sp-btn-blue" id="hmi-sim-p1-ext">FC P1</button>
-                      <button class="sp-btn sp-btn-blue" id="hmi-sim-p2-ext">FC P2</button>
-                      <button class="sp-btn sp-btn-blue" id="hmi-sim-p3-ext">FC P3</button>
+                      <button class="sp-btn sp-btn-blue" id="hmi-sim-p1-ext">100% P1</button>
+                      <button class="sp-btn sp-btn-blue" id="hmi-sim-p2-ext">100% P2</button>
+                      <button class="sp-btn sp-btn-blue" id="hmi-sim-p3-ext">100% P3</button>
+                      <button class="sp-btn sp-btn-fn" id="hmi-sim-p1-ret">0% P1</button>
+                      <button class="sp-btn sp-btn-fn" id="hmi-sim-p2-ret">0% P2</button>
+                      <button class="sp-btn sp-btn-fn" id="hmi-sim-p3-ret">0% P3</button>
                     </div>
                     <div class="sp-mode-row" style="margin-top:6px;">
                       <div class="sp-io">
-                        <div class="lbl">Feedback FC</div>
+                        <div class="lbl">Feedback 0/100%</div>
                         <div class="val" id="hmi-auto-piston-lbl">AUTO</div>
                       </div>
                       <button type="button" class="sp-toggle on" id="hmi-auto-piston" aria-label="Auto feedback pistones">AUTO</button>
@@ -1804,6 +1807,9 @@ const HMI_CMD_DEFAULT = {
   Piston1Extendido: false,
   Piston2Extendido: false,
   Piston3Extendido: false,
+  Piston1Retractado: true,
+  Piston2Retractado: true,
+  Piston3Retractado: true,
   PesoActualKg: 0.04
 };
 let hmiCmd = { ...HMI_CMD_DEFAULT };
@@ -2272,24 +2278,30 @@ function renderHmiFromPlc(data){
 
   syncRealPistonCmdUi({ ...plc, piston1: ps.p1, piston2: ps.p2, piston3: ps.p3 });
 
-  // DEMO: simula finales de carrera simple efecto (1 sensor Extendido por pistón)
+  // DEMO: simula FC doble efecto (0% Retractado + 100% Extendido)
   if(hmiAutoPiston && !hmiModeReal){
     const now = { p1: ps.p1, p2: ps.p2, p3: ps.p3 };
     const keys = [
-      { k: "p1", bit: "Piston1Extendido" },
-      { k: "p2", bit: "Piston2Extendido" },
-      { k: "p3", bit: "Piston3Extendido" }
+      { k: "p1", ext: "Piston1Extendido", ret: "Piston1Retractado" },
+      { k: "p2", ext: "Piston2Extendido", ret: "Piston2Retractado" },
+      { k: "p3", ext: "Piston3Extendido", ret: "Piston3Retractado" }
     ];
-    for(const { k, bit } of keys){
+    for(const { k, ext, ret } of keys){
       if(now[k] && !hmiPrevPistons[k]){
+        // Empieza a extender: sale de casa
         if(hmiPistonTimers[k]) clearTimeout(hmiPistonTimers[k]);
+        pushHmiCmd({ [ret]: false, [ext]: false });
         hmiPistonTimers[k] = setTimeout(() => {
-          pushHmiCmd({ [bit]: true });
+          pushHmiCmd({ [ext]: true, [ret]: false });
         }, 450);
       }
       if(!now[k] && hmiPrevPistons[k]){
+        // Empieza a retractar: deja 100%, luego llega a 0%
         if(hmiPistonTimers[k]) clearTimeout(hmiPistonTimers[k]);
-        pushHmiCmd({ [bit]: false });
+        pushHmiCmd({ [ext]: false, [ret]: false });
+        hmiPistonTimers[k] = setTimeout(() => {
+          pushHmiCmd({ [ext]: false, [ret]: true });
+        }, 450);
       }
     }
     hmiPrevPistons = now;
@@ -2364,18 +2376,28 @@ $("hmi-sim-vidrio")?.addEventListener("click", () => {
   toast(hmiAutoPiston ? "Sim vidrio → P3" : "Sim vidrio → FC P3", { soft: true });
 });
 $("hmi-sim-p1-ext")?.addEventListener("click", () => {
-  pushHmiCmd({ Piston1Extendido: true });
+  pushHmiCmd({ Piston1Extendido: true, Piston1Retractado: false });
 });
 $("hmi-sim-p2-ext")?.addEventListener("click", () => {
-  pushHmiCmd({ Piston2Extendido: true });
+  pushHmiCmd({ Piston2Extendido: true, Piston2Retractado: false });
 });
 $("hmi-sim-p3-ext")?.addEventListener("click", () => {
-  pushHmiCmd({ Piston3Extendido: true });
+  pushHmiCmd({ Piston3Extendido: true, Piston3Retractado: false });
+});
+$("hmi-sim-p1-ret")?.addEventListener("click", () => {
+  pushHmiCmd({ Piston1Extendido: false, Piston1Retractado: true });
+});
+$("hmi-sim-p2-ret")?.addEventListener("click", () => {
+  pushHmiCmd({ Piston2Extendido: false, Piston2Retractado: true });
+});
+$("hmi-sim-p3-ret")?.addEventListener("click", () => {
+  pushHmiCmd({ Piston3Extendido: false, Piston3Retractado: true });
 });
 $("hmi-sim-clear").onclick = () => pushHmiCmd({
   BasculaLista: false, SensorPieza: false,
   SensorPlastico: false, SensorAluminio: false, SensorVidrio: false,
-  Piston1Extendido: false, Piston2Extendido: false, Piston3Extendido: false
+  Piston1Extendido: false, Piston2Extendido: false, Piston3Extendido: false,
+  Piston1Retractado: true, Piston2Retractado: true, Piston3Retractado: true
 });
 $("hmi-auto-piston").onclick = () => {
   hmiAutoPiston = !hmiAutoPiston;
