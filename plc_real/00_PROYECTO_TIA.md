@@ -41,7 +41,8 @@ Crea (mismos nombres que en sim, distinta lógica de I/O):
 Estructura: `DB_CONTRATO_WEB.md` (incluye `Piston1On`/`Piston2On`/`Piston3On` @ 17.x).
 
 ## 6) Tag table
-Copia `TABLA_IO_1214C.md` — **3 solenoides** + **6 finales de carrera**.
+Copia `TABLA_IO_1214C.md` — **6 solenoides** (Ext/Ret) + banda + **3 relés** semáforo + **6 finales de carrera**.  
+Cablea **1L y 2L a +24 V**; el 220 V del semáforo solo en contactos de relé.
 
 ## 7) Download
 1. CPU en STOP o RUN-P según política
@@ -53,8 +54,9 @@ Copia `TABLA_IO_1214C.md` — **3 solenoides** + **6 finales de carrera**.
 
 | | Sim (1511C) | Real (1214C) |
 |---|---|---|
-| Sensores | `DB_HMI.Sensor*` | **`I_Sensor*`** físicos |
-| Pistones | 1 × `M_Piston` | **3 × `Q_Piston1..3`** |
-| Roles | Un cilindro (aluminio) | P1 plástico · P2 latas · P3 vidrio |
+| Sensores | `DB_HMI.Sensor*` + Ext/Ret | **`I_Sensor*`** + `I_PistonNExtendido/Retractado` |
+| Pistones | `M_PistonN` + Ext/Ret sim | **6 × `Q_PistonNExt/Ret`** (5/2 biestable) |
+| Semáforo | `M_Lampara*` | `Q_Lampara*` → **relés** → 220 V |
+| Roles | Tres cilindros sim | P1 plástico · P2 latas · P3 vidrio |
 | Operador (Start/Stop/manual…) | `DB_HMI` | **solo `DB_HMI`** (sin pulsadores físicos) |
 | AS / KEP | no | no |
