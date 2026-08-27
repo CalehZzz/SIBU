@@ -41,7 +41,7 @@ Crea (mismos nombres que en sim, distinta lógica de I/O):
 Estructura: `DB_CONTRATO_WEB.md` (incluye `Piston1On`/`Piston2On`/`Piston3On` @ 17.x).
 
 ## 6) Tag table
-Copia `TABLA_IO_1214C.md` — **6 solenoides** (Ext/Ret) + banda + **3 relés** semáforo + **6 finales de carrera**.  
+Copia `TABLA_IO_1214C.md` — **6 solenoides** (Ext/Ret) + banda + **3 relés** · **5 DI** material · **sin** FC de pistón.  
 Cablea **1L y 2L a +24 V**; el 220 V del semáforo solo en contactos de relé.
 
 ## 7) Download
@@ -54,8 +54,8 @@ Cablea **1L y 2L a +24 V**; el 220 V del semáforo solo en contactos de relé.
 
 | | Sim (1511C) | Real (1214C) |
 |---|---|---|
-| Sensores | `DB_HMI.Sensor*` + Ext/Ret | **`I_Sensor*`** + `I_PistonNExtendido/Retractado` |
-| Pistones | `M_PistonN` + Ext/Ret sim | **6 × `Q_PistonNExt/Ret`** (5/2 biestable) |
+| Sensores | `DB_HMI.Sensor*` | **`I_Sensor*`** (pieza / material / báscula) — **sin** FC pistón |
+| Pistones | `M_PistonN` + Ext/Ret · TON | **6 × `Q_PistonNExt/Ret`** · ciclo por tiempo |
 | Semáforo | `M_Lampara*` | `Q_Lampara*` → **relés** → 220 V |
 | Roles | Tres cilindros sim | P1 plástico · P2 latas · P3 vidrio |
 | Operador (Start/Stop/manual…) | `DB_HMI` | **solo `DB_HMI`** (sin pulsadores físicos) |

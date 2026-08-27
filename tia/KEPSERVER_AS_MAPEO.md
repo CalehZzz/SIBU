@@ -1,5 +1,8 @@
 # KEPServerEX 6 ↔ Automation Studio 10 — mapeo oficial
 
+> **Proyecto actual:** pistones **sin** FC 0 %/100 %. Ver `tia/NETWORKS_WEB_ONLY.md`.  
+> Tags `M_PistonRetractado` / `M_PistonExtendido` abajo son **legado AS**.
+
 **Solo estas tags `%M` van entre AS y el PLC.**  
 **No mapees `DB_HMI` ni `DatosEstacion` en KEPServer.**
 

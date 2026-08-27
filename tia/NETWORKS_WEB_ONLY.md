@@ -1,9 +1,9 @@
-# Networks — solo Web · 3 materiales (doble efecto biestable)
+# Networks — solo Web · 3 materiales (doble efecto · **sin** FC)
 
 **Regla:** sensores + operador = `DB_HMI.*`.  
 Comando = `M_Piston1/2/3` · solenoides sim = `M_PistonNExt` / `M_PistonNRet`.
 
-Cilindros **doble efecto** · 5/2 biestable (Ext + Ret) · FC `PistonNExtendido` (100 %) y `PistonNRetractado` (0 %).
+Cilindros **doble efecto** · 5/2 biestable · **sin** finales de carrera · ciclo por `T_EmpujePistonN`.
 
 ```
   [Sim] → báscula → banda → sensores material
@@ -68,46 +68,33 @@ On · Auto · Pieza · Bascula · SensorVidrio
 
 ### Comando P1/P2/P3 → `M_PistonN`
 ```
-[ ClasifX ]─[/ PistonNExtendido ]─┐
-                                  ├──( ) M_PistonN
-[ On ]─[/ Auto ]─[ Manual… ]──────┘
+[ ClasifX ]──────────────────┐
+                             ├──( ) M_PistonN
+[ On ]─[/ Auto ]─[ Manual… ]─┘
 ```
 
 | Pistón | Auto | Manual |
 |---|---|---|
-| P1 | `M_ClasifPlastico` | `ManualPiston1` |
-| P2 | `M_ClasifAluminio` | `ManualPiston2` |
-| P3 | `M_ClasifVidrio` | `ManualPiston` |
+| P1 | `M_ClasifPlastico` | `ManualPiston1` @ 1.4 |
+| P2 | `M_ClasifAluminio` | `ManualPiston2` @ 1.5 |
+| P3 | `M_ClasifVidrio` | `ManualPiston` @ 0.7 |
 
 ### Solenoides Ext / Ret
 ```
-[ M_PistonN ]─[/ PistonNExtendido ]─[/ M_PistonNRet ]──( ) M_PistonNExt
-[/ M_PistonN ]─[/ PistonNRetractado ]─[/ M_PistonNExt ]──( ) M_PistonNRet
+[ M_SistemaOn ]─[ M_PistonN ]─[/ M_PistonNRet ]──( ) M_PistonNExt
+[ M_SistemaOn ]─[/ M_PistonN ]─[/ M_PistonNExt ]──( ) M_PistonNRet
 ```
 
-### Retardo + contar (cada material)
+### Contar + retractar (por tiempo)
 ```
-ClasifPlastico · Piston1Extendido → TON T_RetardoPiston1 → (R) Clasif + ContPlastico++
-ClasifAluminio · Piston2Extendido → TON T_RetardoPiston2 → (R) Clasif + ContAluminio++
-ClasifVidrio   · Piston3Extendido → TON T_RetardoPiston3 → (R) Clasif + ContVidrio++
+ClasifPlastico ──[ TON T_EmpujePiston1  PT:=T#1s ] → (R) Clasif + ContPlastico++
+ClasifAluminio ──[ TON T_EmpujePiston2  PT:=T#1s ] → (R) Clasif + ContAluminio++
+ClasifVidrio   ──[ TON T_EmpujePiston3  PT:=T#1s ] → (R) Clasif + ContVidrio++
 ```
 `UltimoMaterial`: 1 plástico · 2 aluminio · 3 vidrio.
 
-### Timeouts
-```
-ClasifX · TON Timeout → /PistonNExtendido → (S) M_Alarma
-```
-
 ```
 M_Clasificando := ClasifPlastico OR ClasifAluminio OR ClasifVidrio;
-```
-
----
-
-## FC_Alarmas (extra)
-
-```
-PistonNExtendido · PistonNRetractado → (S) M_Alarma
 ```
 
 ---
@@ -117,8 +104,8 @@ PistonNExtendido · PistonNRetractado → (S) M_Alarma
 ```scl
 DatosEstacion.BandaOn   := M_Banda;
 DatosEstacion.PistonOn  := M_Piston1 OR M_Piston2 OR M_Piston3;
-DatosEstacion.Piston1On := M_Piston1;  // plástico
-DatosEstacion.Piston2On := M_Piston2;  // latas
-DatosEstacion.Piston3On := M_Piston3;  // vidrio
+DatosEstacion.Piston1On := M_Piston1;
+DatosEstacion.Piston2On := M_Piston2;
+DatosEstacion.Piston3On := M_Piston3;
 DatosEstacion.PesoActualKg := DB_HMI.PesoActualKg;
 ```
