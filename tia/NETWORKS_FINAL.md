@@ -1,6 +1,6 @@
 # Networks FINAL — sin confusión
 
-> **Modo actual:** simulación **solo HMI · 3 pistones doble efecto (Ext/Ret)** → **`tia/NETWORKS_WEB_ONLY.md`**.  
+> **Modo actual:** simulación **solo HMI · 3 pistones doble efecto (Ext/Ret · sin FC)** → **`tia/NETWORKS_WEB_ONLY.md`**.  
 > Este archivo describe el esquema anterior (1 pistón). No lo uses para el proyecto sim actual.
 
 **Regla única (modo web-only · legado 1 pistón):**
