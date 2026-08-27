@@ -1,7 +1,8 @@
 # Networks FINAL — sin confusión
 
-> **Modo actual:** simulación **solo HMI · 3 pistones doble efecto (Ext/Ret · sin FC)** → **`tia/NETWORKS_WEB_ONLY.md`**.  
-> Este archivo describe el esquema anterior (1 pistón). No lo uses para el proyecto sim actual.
+> **Modo actual:** simulación **solo HMI · 3 pistones Ext/Ret · sin FC** → **`tia/NETWORKS_WEB_ONLY.md`** (NW numeradas).  
+> PLC real: **`plc_real/NETWORKS_LAD.md`**.  
+> Este archivo describe el esquema anterior (1 pistón). No lo uses para el proyecto actual.
 
 **Regla única (modo web-only · legado 1 pistón):**
 - `DB_HMI.*` = botones **y sensores simulados** de la web
