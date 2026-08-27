@@ -19,9 +19,9 @@ En el modo **web-only** el operador **no** usa estas `%I`. Se dejan documentadas
 | Dirección | Nombre simbólico | Tipo | Descripción |
 |---|---|---|---|
 | — | *(sin botonera)* | — | Start/Stop/Emergencia/Manual → `DB_HMI` |
-| — | Sensores sim | — | `DB_HMI.Sensor*` / Ext 100 % / Ret 0 % |
+| — | Sensores sim | — | `DB_HMI.Sensor*` (pieza / material / báscula) |
 
-Para el **PLC real 1214C** ver `plc_real/TABLA_IO_1214C.md` (**11 DI** + **10 DQ**, comunes 24 V + relés 220 V).
+Para el **PLC real 1214C** ver `plc_real/TABLA_IO_1214C.md` (**5 DI** + **10 DQ**, comunes 24 V + relés 220 V · **sin** FC pistón).
 
 ---
 
@@ -52,10 +52,9 @@ Para el **PLC real 1214C** ver `plc_real/TABLA_IO_1214C.md` (**11 DI** + **10 DQ
 | `M_ClasifPlastico` | Bool | `%M0.3` | Secuencia P1 |
 | `M_ClasifAluminio` | Bool | `%M0.4` | Secuencia P2 |
 | `M_Clasificando` | Bool | `%M0.7` | OR clasif (banda) |
-| `T_RetardoPiston1/2/3` | TON IEC | auto | Espera extendido antes de contar |
-| `T_TimeoutPiston1/2/3` | TON IEC | auto | Alarma si no llega a 100% |
+| `T_EmpujePiston1/2/3` | TON IEC | auto | Tiempo de empuje → contar / retractar |
 
-> Inserta el bloque **TON** y nombra la instancia (`T_RetardoPiston2`…). Contactos: `T_RetardoPiston2.Q`.  
+> Inserta el bloque **TON** y nombra la instancia (`T_EmpujePiston1`…). Contactos: `T_EmpujePiston1.Q`.  
 > Networks: `tia/NETWORKS_WEB_ONLY.md`.
 ---
 

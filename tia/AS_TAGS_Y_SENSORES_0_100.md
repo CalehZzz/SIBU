@@ -1,4 +1,8 @@
-# Automation Studio — tags equivalentes + sensores 0% / 100%
+# Automation Studio — tags equivalentes (**legado AS**)
+
+> **Proyecto actual (web / PLC real):** pistones **sin** sensores 0 % / 100 %.  
+> Usa `tia/NETWORKS_WEB_ONLY.md` / `plc_real/NETWORKS_LAD.md` (ciclo por TON).  
+> Este archivo solo aplica si aún usas Automation Studio con detectores de cilindro.
 
 Nombres actuales (iguales en TIA, KEPServer y AS):
 
@@ -8,10 +12,10 @@ Nombres actuales (iguales en TIA, KEPServer y AS):
 | `M_SensorPlastico` | `%M2.1` | Pulsador / sensor material plástico |
 | `M_SensorAluminio` | `%M2.2` | Pulsador / sensor material aluminio |
 | `M_BasculaLista` | `%M2.3` | Señal “báscula lista” |
-| `M_PistonRetractado` | `%M2.4` | **Sensor del cilindro en 0%** (vástago adentro) |
-| `M_PistonExtendido` | `%M2.5` | **Sensor del cilindro en 100%** (vástago afuera) |
+| ~~`M_PistonRetractado`~~ | ~~`%M2.4`~~ | **No usar** en el diseño actual (sin FC) |
+| ~~`M_PistonExtendido`~~ | ~~`%M2.5`~~ | **No usar** en el diseño actual (sin FC) |
 | `M_Banda` | `%M3.0` | Bobina / motor / lámpara de la banda |
-| `M_Piston` | `%M3.1` | Solenoide de la válvula 5/2 |
+| `M_Piston` | `%M3.1` | Solenoide (legado 1 pistón) / ver Ext/Ret en docs actuales |
 | `M_LamparaRun` | `%M3.2` | Lámpara verde (opcional) |
 | `M_LamparaAlarma` | `%M3.3` | Lámpara alarma (opcional) |
 | `M_LamparaEmergencia` | `%M3.4` | Lámpara emergencia (opcional) |

@@ -1,17 +1,22 @@
 # Cómo usar el TON en TIA Portal (S7-1200) — sin enredarte
 
+> **Diseño actual:** pistones **sin** FC. El TON de empuje (`T_EmpujePistonN`) se dispara con `M_Clasif*`  
+> (no con `I_PistonExtendido`). Ver `tia/NETWORKS_WEB_ONLY.md` / `plc_real/NETWORKS_LAD.md`.
+
 En S7-1200 el temporizador **TON no es un tag Bool** que pones en un contacto.
 Es un **bloque** que necesita su propia “cajita de memoria” (instance DB).
 
 Por eso:
 - en los `???` de arriba solo te aparece cosas como `DatosEstacion` → **no elijas eso**
-- en un contacto normalmente abierto **no te deja** poner `T_RetardoPiston` solo → es normal
+- en un contacto normalmente abierto **no te deja** poner `T_EmpujePiston1` solo → es normal
 
 ---
 
 ## Lo que vas a crear
 
-Dos temporizadores IEC:
+Temporizadores IEC de empuje (uno por pistón):
+
+- `T_EmpujePiston1` / `T_EmpujePiston2` / `T_EmpujePiston3` — tipico `PT:=T#1s`
 
 1. `T_RetardoPiston` — 0.5 s con el pistón extendido  
 2. `T_TimeoutPiston` — 3 s de seguridad  
@@ -88,7 +93,9 @@ Tiene que ser **`.Q`** (la salida Bool del timer).
 ## Network de ejemplo (retardo pistón)
 
 ```
---| M_Clasificando |----| I_PistonExtendido |----[ TON  T_RetardoPiston  PT:=T#500ms ]
+--| M_ClasifPlastico |----[ TON  T_EmpujePiston1  PT:=T#1s ]
+--| T_EmpujePiston1.Q |----( R  M_ClasifPlastico )  // + contar
+
                                                                       Q ----( R  M_Clasificando )
 ```
 

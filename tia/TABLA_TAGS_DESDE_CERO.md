@@ -24,7 +24,7 @@ Página SIBU / HMI virtual (KTP700)
 | **B. Lógica interna** | `%M` | Sistema, modos, **3 pistones**, clasif |
 | **C. DB_HMI (DB3)** | DB | Comandos + sensores simulados |
 | **D. DatosEstacion (DB1)** | DB | Contadores / estado → web |
-| **E. Timers** | TON IEC | Retardo y timeout P2 / P3 |
+| **E. Timers** | TON IEC | Empuje por tiempo P1/P2/P3 |
 
 ~~Grupo A (AS/KEP)~~ — no necesario en web-only.
 
@@ -55,11 +55,11 @@ Página SIBU / HMI virtual (KTP700)
 | `M_Piston3Ret` | `%M4.5` | Solenoide B P3 (sim) |
 
 > Cilindros **doble efecto** (5/2 biestable): `M_PistonN` = comando; `M_PistonNExt`/`Ret` = solenoides.  
-> FC sim: `DB_HMI.PistonNExtendido` (100 %) y `DB_HMI.PistonNRetractado` (0 %).
+> **Sin** FC de posición: el ciclo AUTO usa `T_EmpujePistonN`.
 
 ---
 
-## C) `DB_HMI` — número **3** · Optimized **OFF** · ≥ **7 bytes**
+## C) `DB_HMI` — número **3** · Optimized **OFF** · ≥ **6 bytes**
 
 | Nombre | Tipo | Offset | Control web |
 |---|---|---|---|
@@ -68,16 +68,10 @@ Página SIBU / HMI virtual (KTP700)
 | `SensorPieza` | Bool | 1.1 | Sim pieza |
 | `SensorPlastico` | Bool | 1.2 | Sim plástico |
 | `SensorAluminio` | Bool | 1.3 | Sim aluminio |
-| `Piston1Extendido` | Bool | 1.4 | Sim FC P1 **100 %** |
-| `Piston2Extendido` | Bool | 1.5 | Sim FC P2 **100 %** |
-| `ManualPiston1` | Bool | 1.6 | Manual P1 |
-| `ManualPiston2` | Bool | 1.7 | Manual P2 |
+| `ManualPiston1` | Bool | **1.4** | Manual P1 |
+| `ManualPiston2` | Bool | **1.5** | Manual P2 |
+| `SensorVidrio` | Bool | **1.6** | Sim vidrio |
 | `PesoActualKg` | Real | **2.0** | Peso |
-| `Piston3Extendido` | Bool | **6.0** | Sim FC P3 **100 %** |
-| `SensorVidrio` | Bool | **6.1** | Sim vidrio |
-| `Piston1Retractado` | Bool | **6.2** | Sim FC P1 **0 %** |
-| `Piston2Retractado` | Bool | **6.3** | Sim FC P2 **0 %** |
-| `Piston3Retractado` | Bool | **6.4** | Sim FC P3 **0 %** |
 
 Detalle completo: `tia/MAPA_DB_HMI.md`.
 
@@ -108,23 +102,22 @@ Detalle completo: `tia/MAPA_DB_HMI.md`.
 | `ContVidrio` | Int | **22.0** | Piezas vidrio |
 | `PesoVidrioKg` | Real | **24.0** | kg vidrio |
 
-Si el probe dice DB1 < 28 B o DB3 < 7 B → `plc_real/FIX_DB_INVALID_ADDRESS.md`.
+Si el probe dice DB1 < 28 B o DB3 < 6 B → `plc_real/FIX_DB_INVALID_ADDRESS.md`.
 
 ## E) Timers
 
 | Instancia | PT | Uso |
 |---|---|---|
-| `T_RetardoPiston2` | `T#500ms` | Contar plástico tras P2 extendido |
-| `T_RetardoPiston3` | `T#500ms` | Contar aluminio tras P3 extendido |
-| `T_TimeoutPiston2` | `T#3s` | Alarma si P2 no llega a 100% |
-| `T_TimeoutPiston3` | `T#3s` | Alarma si P3 no llega a 100% |
+| `T_EmpujePiston1` | `T#1s` | Tiempo empuje P1 → contar / retractar |
+| `T_EmpujePiston2` | `T#1s` | Tiempo empuje P2 |
+| `T_EmpujePiston3` | `T#1s` | Tiempo empuje P3 |
 
 ---
 
 ## Mapa mental
 
 ```
-HMI virtual (3× Extender/Retractar + sim sensores)
+HMI virtual (3× Extender/Retractar + sim sensores material)
         ↓  hmi_comandos/{estación}
    plc_bridge.py
         ↓  DB_HMI
@@ -138,7 +131,7 @@ HMI virtual (3× Extender/Retractar + sim sensores)
 ## Checklist TIA (sim)
 
 1. Crear `DB_HMI` (DB3) y `DatosEstacion` (DB1) con offsets de arriba · Optimized **OFF**
-2. Tags `%M` de los 3 comandos + 6 solenoides Ext/Ret + latches
+2. Tags `%M` de los 3 comandos + 6 solenoides Ext/Ret + latches (**sin** FC)
 3. Programar networks de `NETWORKS_WEB_ONLY.md`
 4. Download a PLCSIM Advanced · PUT/GET ON
 5. Bridge: `py plc_bridge.py parque-central --ip 192.168.0.1 --db 1 --db-hmi 3`

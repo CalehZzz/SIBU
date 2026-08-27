@@ -1,6 +1,6 @@
-# Networks LAD — PLC real 1214C (doble efecto · 6 solenoides)
+# Networks LAD — PLC real 1214C (doble efecto · **sin** FC pistones)
 
-**Reglas:** sensores `I_*` · actuadores `Q_*` · operador solo `DB_HMI.*` · espejo `DatosEstacion`.
+**Reglas:** sensores material `I_*` · actuadores `Q_*` · operador solo `DB_HMI.*` · espejo `DatosEstacion`.
 
 | Pistón | Ext | Ret | Material |
 |---|---|---|---|
@@ -8,11 +8,11 @@
 | P2 | `Q_Piston2Ext` | `Q_Piston2Ret` | Latas |
 | P3 | `Q_Piston3Ext` | `Q_Piston3Ret` | Vidrio |
 
-Cilindros **doble efecto** · válvula **5/2 biestable** (2 solenoides) · FC 100 % / 0 %.  
-Comunes **1L y 2L → 24 V**; semáforo 220 V vía relés (`Q_Lampara*`).  
+Cilindros **doble efecto** · 5/2 biestable · **sin** finales de carrera.  
+Ciclo AUTO por **TON** (`T_EmpujePistonN`). Comunes **1L/2L → 24 V**; semáforo vía relés.  
 Detalle I/O: `TABLA_IO_1214C.md`.
 
-La versión sim (mismos roles, sensores en `DB_HMI`) está en `tia/NETWORKS_WEB_ONLY.md`.
+Sim: `tia/NETWORKS_WEB_ONLY.md`.
 
 ---
 
@@ -25,7 +25,7 @@ La versión sim (mismos roles, sensores en `DB_HMI`) está en `tia/NETWORKS_WEB_
 - START → `(S) M_SistemaOn` (con `/Stop` `/Emergencia`)
 - STOP / EMERGENCIA → `(R) M_SistemaOn`
 - `DB_HMI.ModoAuto` → `M_ModoAuto`
-- Lámparas (bobinas de relé 24 V):
+- Lámparas (bobinas relé 24 V):
   - `M_SistemaOn` · `/Emergencia` → `Q_LamparaRun`
   - `M_Alarma` → `Q_LamparaAlarma`
   - `DB_HMI.Emergencia` → `Q_LamparaEmergencia`
@@ -40,60 +40,61 @@ La versión sim (mismos roles, sensores en `DB_HMI`) está en `tia/NETWORKS_WEB_
 **Latch latas** (`I_SensorAluminio`) → `(S) M_ClasifAluminio`  
 **Latch vidrio** (`I_SensorVidrio`) → `(S) M_ClasifVidrio`
 
-### Comando pistón → `M_PistonN` (deseo extendido)
-
-Una bobina por pistón, dos ramas (igual que antes):
+### Comando pistón → `M_PistonN`
 
 ```
-AUTO:   ClasifX · /I_PistonNExtendido ──┐
-                                        ├──( ) M_PistonN
+AUTO:   ClasifX ─────────────────────┐
+                                     ├──( ) M_PistonN
 MANUAL: M_SistemaOn · /M_ModoAuto · DB_HMI.Manual… ─┘
 ```
 
 | Pistón | Auto | Manual (`DB_HMI`) |
 |---|---|---|
-| P1 | `M_ClasifPlastico` | `ManualPiston1` @ 1.6 |
-| P2 | `M_ClasifAluminio` | `ManualPiston2` @ 1.7 |
+| P1 | `M_ClasifPlastico` | `ManualPiston1` @ **1.4** |
+| P2 | `M_ClasifAluminio` | `ManualPiston2` @ **1.5** |
 | P3 | `M_ClasifVidrio` | `ManualPiston` @ 0.7 |
 
-### Solenoides Ext / Ret (interlock + corte por FC)
+### Solenoides Ext / Ret (interlock · sin corte por FC)
 
 ```
-[ M_PistonN ]─[/ I_PistonNExtendido ]─[/ Q_PistonNRet ]──( ) Q_PistonNExt
-[/ M_PistonN ]─[/ I_PistonNRetractado ]─[/ Q_PistonNExt ]──( ) Q_PistonNRet
+[ M_SistemaOn ]─[ M_PistonN ]─[/ Q_PistonNRet ]──( ) Q_PistonNExt
+[ M_SistemaOn ]─[/ M_PistonN ]─[/ Q_PistonNExt ]──( ) Q_PistonNRet
 ```
 
-**Importante (doble efecto · 5/2 biestable):**  
-- **Extender** = `M_PistonN = 1` → `Q_…Ext` ON hasta FC 100 %  
-- **Retractar** = `M_PistonN = 0` → `Q_…Ret` ON hasta FC 0 %  
-- Ext y Ret **nunca** a la vez (`/Q_…` cruzados)  
-- Sin **START** (`M_SistemaOn`) la rama MANUAL no pone `M_PistonN`  
-- Debe existir modo **MANUAL** (`DB_HMI.ModoAuto = 0`)  
-- Casa = `I_PistonNRetractado` · fuera = `I_PistonNExtendido`
+**Importante:**  
+- Extender = `M_PistonN = 1` → `Q_…Ext` ON  
+- Retractar = `M_PistonN = 0` → `Q_…Ret` ON (con sistema ON)  
+- Ext y Ret **nunca** a la vez  
+- Sin sensores de posición: el tiempo de empuje lo marca el TON
 
-**Contar:** TON retardo con `I_PistonNExtendido` → reset latch + incrementar `Cont*` / `Peso*`  
-`UltimoMaterial` = 1 / 2 / 3
+### Contar + retractar (por tiempo)
 
-**Timeouts:** TON 3 s sin FC 100 % → `(S) M_Alarma`
+```
+ClasifX ──[ TON T_EmpujePistonN  PT:=T#1s ]
+T_EmpujePistonN.Q → (R) ClasifX + Cont*++ / Peso*++ + UltimoMaterial
+```
+
+Al resetear el latch, `M_PistonN` cae en AUTO → `Q_…Ret` ON.
+
+`UltimoMaterial` = 1 / 2 / 3  
+Ajusta `PT` al tiempo real de carrera del cilindro (ej. `T#800ms` … `T#1500ms`).
 
 `M_Clasificando := ClasifPlastico OR ClasifAluminio OR ClasifVidrio`
 
 ---
 
-## FC_Alarmas (extra doble efecto)
+## FC_Alarmas
 
-```
-I_PistonNExtendido · I_PistonNRetractado → (S) M_Alarma   // sensores contradictorios
-```
-
-(Repetir para N = 1, 2, 3. Reset alarma con `DB_HMI.ResetAlarma`.)
+Sin alarmas de FC contradictorios.  
+Reset alarma: `DB_HMI.ResetAlarma` → `(R) M_Alarma`  
+(Opcional: timeout de proceso si `ClasifX` dura demasiado — no depende de sensores de pistón.)
 
 ---
 
 ## FC_EspejoWeb
 ```scl
 DatosEstacion.BandaOn   := Q_Banda;
-DatosEstacion.Piston1On := M_Piston1;  // comando / deseo extendido (no solo Q_Ext)
+DatosEstacion.Piston1On := M_Piston1;
 DatosEstacion.Piston2On := M_Piston2;
 DatosEstacion.Piston3On := M_Piston3;
 DatosEstacion.PistonOn  := M_Piston1 OR M_Piston2 OR M_Piston3;

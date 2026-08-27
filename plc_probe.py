@@ -70,7 +70,7 @@ def main() -> None:
         if ok_sizes:
             mx = max(ok_sizes)
             found.append((dbn, mx))
-            print(f"  DB{dbn}: OK hasta {mx} bytes  (DatosEstacion≥28, DB_HMI≥7)")
+            print(f"  DB{dbn}: OK hasta {mx} bytes  (DatosEstacion≥28, DB_HMI≥6)")
         else:
             print(f"  DB{dbn}: no legible  ({last_err})")
 
@@ -94,9 +94,9 @@ def main() -> None:
             elif s >= 7:
                 print(f"  DB{n}: {s}B — si es DatosEstacion, falta ampliar (necesita ≥28)")
             if s >= 7:
-                print(f"  candidato DB_HMI: --db-hmi {n}  (tamaño OK ≥7)")
+                print(f"  candidato DB_HMI: --db-hmi {n}  (tamaño OK ≥6)")
             elif s > 0:
-                print(f"  DB{n}: {s}B — si es DB_HMI, agrega PesoActualKg Real + byte 6 (necesita ≥7)")
+                print(f"  DB{n}: {s}B — si es DB_HMI, agrega ManualPiston1/2 @1.4/1.5 · SensorVidrio @1.6 · PesoActualKg @2.0 (necesita ≥6)")
         print()
         print("Si DB1 no aparece pero otro sí: en TIA el número del DB no es 1,")
         print("o DatosEstacion no se descargó. Mira en TIA el [DBx] al lado del nombre.")

@@ -29,13 +29,13 @@ except ImportError:
 SERVICE_ACCOUNT_PATH = "serviceAccountKey.json"
 # DatosEstacion termina en ContVidrio@22 + PesoVidrioKg@24 → 28 bytes.
 DB_READ_SIZE = 28
-# DB_HMI: bools 0..1 + Real @2.0 + Ext/Ret/SensorVidrio @6.x → 7 bytes.
-DB_HMI_SIZE = 7
+# DB_HMI: bools 0..1 + Real PesoActualKg @ 2.0 → 6 bytes (sin FC pistones).
+DB_HMI_SIZE = 6
 PESO_OFFSET = 2  # si tu DB_HMI muestra otro offset al compilar, cámbialo aquí
 
 # Tamaños de fallback si el DB en el PLC aún no está ampliado (TIA Download pendiente).
 DB_READ_FALLBACKS = (28, 24, 22, 20, 18)
-DB_HMI_WRITE_FALLBACKS = (7, 6, 2)
+DB_HMI_WRITE_FALLBACKS = (6, 2)
 
 ESTADO_TXT = {0: "idle", 1: "running", 2: "clasificando", 3: "alarma", 4: "emergencia"}
 MATERIAL_TXT = {0: None, 1: "plastico", 2: "aluminio", 3: "vidrio"}
@@ -78,15 +78,9 @@ BOOL_MAP = [
     ("SensorPieza", 1, 1),
     ("SensorPlastico", 1, 2),
     ("SensorAluminio", 1, 3),     # latas
-    ("Piston1Extendido", 1, 4),   # sim FC P1 @ 100%
-    ("Piston2Extendido", 1, 5),   # sim FC P2 @ 100%
-    ("ManualPiston1", 1, 6),      # manual P1 plástico
-    ("ManualPiston2", 1, 7),      # manual P2 latas
-    ("Piston3Extendido", 6, 0),   # sim FC P3 @ 100%
-    ("SensorVidrio", 6, 1),       # sim sensor vidrio
-    ("Piston1Retractado", 6, 2),  # sim FC P1 @ 0%
-    ("Piston2Retractado", 6, 3),  # sim FC P2 @ 0%
-    ("Piston3Retractado", 6, 4),  # sim FC P3 @ 0%
+    ("ManualPiston1", 1, 4),      # manual P1 plástico
+    ("ManualPiston2", 1, 5),      # manual P2 latas
+    ("SensorVidrio", 1, 6),       # sim / real → I_SensorVidrio
 ]
 
 
@@ -185,7 +179,7 @@ def diagnostico_dbs(client: snap7.client.Client, db_datos: int, db_hmi: int) -> 
             print(f"  DB{dbn} ({label}): parcial — solo {max_ok} bytes (necesitas {need})")
             print("  → El DB es demasiado pequeño: agrega todos los campos y vuelve a descargar.")
             if label == "DB_HMI":
-                print("  → Campos: PesoActualKg @2.0 + Ext/Ret @6.x + SensorVidrio @6.1")
+                print("  → Campos: ManualPiston1/2 @1.4/1.5 · SensorVidrio @1.6 · PesoActualKg @2.0")
             else:
                 print("  → Campos: ContVidrio Int @22 + PesoVidrioKg Real @24 (total 28 B)")
         else:
@@ -274,8 +268,8 @@ def escribir_db_hmi(client: snap7.client.Client, db_hmi: int, cmd: dict) -> None
                 _warn_once(
                     "hmi_parcial",
                     f"⚠️  DB_HMI (DB{db_hmi}) solo admite escritura de {sz} B "
-                    f"(ideal {DB_HMI_SIZE}). En TIA agrega PesoActualKg Real @2.0 + "
-                    "Ext/Ret @6.x + SensorVidrio @6.1 → Download. "
+                    f"(ideal {DB_HMI_SIZE}). En TIA: ManualPiston1/2 @1.4/1.5 · "
+                    "SensorVidrio @1.6 · PesoActualKg Real @2.0 → Download. "
                     f"Mientras tanto se escriben {sz} bytes. "
                     "Ver plc_real/FIX_DB_INVALID_ADDRESS.md",
                 )
