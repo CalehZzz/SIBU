@@ -215,7 +215,7 @@ def main() -> None:
         help='Ej: libcamera-still -n -t 1 -o {path}',
     )
     p.add_argument("--photo-path", default=PHOTO_DEFAULT)
-    p.add_argument("--model", default="gemini-2.0-flash")
+    p.add_argument("--model", default="gemini-3.8-flash")
     p.add_argument(
         "--mock-material",
         default="",

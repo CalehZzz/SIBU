@@ -67,7 +67,7 @@ def parse_args() -> argparse.Namespace:
         help='Comando que guarda JPEG en --photo-path. Ej: libcamera-still -n -o {path}',
     )
     p.add_argument("--photo-path", default="/tmp/sibu_shot.jpg")
-    p.add_argument("--model", default="gemini-2.0-flash")
+    p.add_argument("--model", default="gemini-3.8-flash")
     p.add_argument(
         "--mock-material",
         default="",
