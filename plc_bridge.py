@@ -29,9 +29,12 @@ except ImportError:
 SERVICE_ACCOUNT_PATH = "serviceAccountKey.json"
 # DatosEstacion termina en ContVidrio@22 + PesoVidrioKg@24 → 28 bytes.
 DB_READ_SIZE = 28
-# DB_HMI: bools 0..1 + Real PesoActualKg @ 2.0 → 6 bytes (sin FC pistones).
-DB_HMI_SIZE = 6
+# DB_HMI: bools 0..1 + Real PesoActualKg @ 2.0 + VisionMaterial Int @ 6.0 → 8 bytes.
+# El bridge HMI solo ESCRIBE bytes 0..5 (no pisa VisionMaterial; eso lo escribe la Pi/Gemini).
+DB_HMI_SIZE = 8
+DB_HMI_WRITE_SIZE = 6
 PESO_OFFSET = 2  # si tu DB_HMI muestra otro offset al compilar, cámbialo aquí
+VISION_OFFSET = 6  # Int: 0 ninguno · 1 plástico · 2 aluminio · 3 vidrio
 
 # Tamaños de fallback si el DB en el PLC aún no está ampliado (TIA Download pendiente).
 DB_READ_FALLBACKS = (28, 24, 22, 20, 18)
@@ -179,7 +182,10 @@ def diagnostico_dbs(client: snap7.client.Client, db_datos: int, db_hmi: int) -> 
             print(f"  DB{dbn} ({label}): parcial — solo {max_ok} bytes (necesitas {need})")
             print("  → El DB es demasiado pequeño: agrega todos los campos y vuelve a descargar.")
             if label == "DB_HMI":
-                print("  → Campos: ManualPiston1/2 @1.4/1.5 · SensorVidrio @1.6 · PesoActualKg @2.0")
+                print(
+                    "  → Campos: ManualPiston1/2 @1.4/1.5 · SensorVidrio @1.6 · "
+                    "PesoActualKg @2.0 · VisionMaterial Int @6.0 (total 8 B)"
+                )
             else:
                 print("  → Campos: ContVidrio Int @22 + PesoVidrioKg Real @24 (total 28 B)")
         else:
@@ -264,12 +270,13 @@ def escribir_db_hmi(client: snap7.client.Client, db_hmi: int, cmd: dict) -> None
             set_real(raw, PESO_OFFSET, peso)
         try:
             client.db_write(db_hmi, 0, raw)
-            if sz < DB_HMI_SIZE:
+            if sz < DB_HMI_WRITE_SIZE:
                 _warn_once(
                     "hmi_parcial",
                     f"⚠️  DB_HMI (DB{db_hmi}) solo admite escritura de {sz} B "
-                    f"(ideal {DB_HMI_SIZE}). En TIA: ManualPiston1/2 @1.4/1.5 · "
-                    "SensorVidrio @1.6 · PesoActualKg Real @2.0 → Download. "
+                    f"(ideal write {DB_HMI_WRITE_SIZE}, DB ≥ {DB_HMI_SIZE}). "
+                    "En TIA: ManualPiston1/2 @1.4/1.5 · SensorVidrio @1.6 · "
+                    "PesoActualKg @2.0 · VisionMaterial Int @6.0 → Download. "
                     f"Mientras tanto se escriben {sz} bytes. "
                     "Ver plc_real/FIX_DB_INVALID_ADDRESS.md",
                 )

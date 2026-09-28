@@ -9,13 +9,18 @@ Operador **100 % web** (`DB_HMI`). En mesa: sensores de material + banda + 3 cil
 | **P3** | `Q_Piston3Ext` | `Q_Piston3Ret` | Vidrio |
 
 ```
-  [Entrada] → [Báscula] → [Banda] → sensores material
-                                      ├─ plástico → P1 (Ext/Ret)
-                                      ├─ latas    → P2 (Ext/Ret)
-                                      └─ vidrio   → P3 (Ext/Ret)
+  [Entrada] → [Báscula] → [Banda] → cámara Gemini (VisionMaterial 1/2/3)
+                                      │
+              espera sensor de ESA vía:
+                                      ├─ Vision=1 + I_SensorPlastico → paro + P1
+                                      ├─ Vision=2 + I_SensorAluminio → paro + P2
+                                      └─ Vision=3 + I_SensorVidrio   → paro + P3
 ```
 
-**Sin finales de carrera:** el ciclo de empuje es por **TON** (tiempo de extensión), no por sensores 0 % / 100 %.  
+**Los 3 sensores `I_Sensor*` son de posición** (uno por vía/pistón), no identifican el material.  
+La identificación la hace **Gemini → `DB_HMI.VisionMaterial`**. Ver `NETWORKS_LAD.md`.
+
+**Sin finales de carrera en pistones:** el ciclo de empuje es por **TON**, no por FC 0 % / 100 %.  
 **Doble efecto biestable:** `Q_…Ext = 1` / `Q_…Ret = 0` → extiende · al revés retracta.  
 **Nunca** energizar Ext y Ret a la vez (interlock en LAD).
 
@@ -35,17 +40,18 @@ Semáforo (lámparas **220 V**): cada `Q_Lampara*` → bobina 24 V de un relé; 
 
 ---
 
-## Entradas `%I` (5) — solo material / báscula
+## Entradas `%I` (5) — pieza / posición por vía / báscula
 
-| Dir | Tag | Hardware |
-|---|---|---|
-| `%I0.0` | `I_SensorPieza` | Pieza presente |
-| `%I0.1` | `I_SensorPlastico` | Plástico |
-| `%I0.2` | `I_SensorAluminio` | Latas |
-| `%I0.3` | `I_SensorVidrio` | Vidrio |
-| `%I0.4` | `I_BasculaLista` | Báscula lista |
+| Dir | Tag | Hardware | Rol |
+|---|---|---|---|
+| `%I0.0` | `I_SensorPieza` | Óptico entrada | Trigger cámara (Pi) + presencia |
+| `%I0.1` | `I_SensorPlastico` | Óptico vía P1 | Posición: “llegó a chute plástico” |
+| `%I0.2` | `I_SensorAluminio` | Óptico vía P2 | Posición: “llegó a chute latas” |
+| `%I0.3` | `I_SensorVidrio` | Óptico vía P3 | Posición: “llegó a chute vidrio” |
+| `%I0.4` | `I_BasculaLista` | Báscula lista | Peso válido |
 
-> **No** hay `I_Piston*Extendido` / `I_Piston*Retractado`.
+> **No** hay `I_Piston*Extendido` / `I_Piston*Retractado`.  
+> Tipo de material = `DB_HMI.VisionMaterial` (Gemini), **no** estos `%I`.
 
 ---
 
@@ -71,10 +77,11 @@ Semáforo (lámparas **220 V**): cada `Q_Lampara*` → bobina 24 V de un relé; 
 `M_SistemaOn` · `M_ModoAuto` · `M_Alarma` · `M_ClasifPlastico` · `M_ClasifAluminio` · `M_ClasifVidrio` · `M_Clasificando`  
 `M_Piston1` / `M_Piston2` / `M_Piston3` = comando “quiero extendido” → derivan `Q_…Ext` / `Q_…Ret`.
 
-Timers: `T_EmpujePiston1/2/3` (tiempo de extensión antes de contar / retractar).
+Timers: `T_EmpujePiston1/2/3` (empuje) · `T_TimeoutVision` (visión sin sensor).
 
 ---
 
 ## DBs
 
-`DatosEstacion` DB1 · `DB_HMI` DB3 · Optimized **OFF** (ver `DB_CONTRATO_WEB.md`)
+`DatosEstacion` DB1 · `DB_HMI` DB3 (**≥ 8 bytes**, incluye `VisionMaterial` Int @ 6.0) · Optimized **OFF**  
+Ver `DB_CONTRATO_WEB.md`.

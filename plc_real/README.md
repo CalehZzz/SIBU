@@ -10,10 +10,15 @@ No reutilices el hardware config del 1511C: crea un proyecto TIA nuevo con CPU *
 ```
 Página SIBU / HMI web  (Start, Stop, manual, emergencia…)
         ↕ Firestore  (estación: colegio-don-bosco-real)
-   plc_bridge.py / plc_bridge_real.py
-        ↕ snap7  (IP del 1214C en la red)
-   CPU 1214C AC/DC/Rly  + sensores material + banda + 6 solenoides + 3 relés
+   Raspberry Pi 4
+        ├─ plc_bridge_real.py  (HMI ↔ PLC ↔ web)
+        └─ costa_rica/vision_gemini.py  (cámara → Gemini → VisionMaterial)
+        ↕ snap7  (IP del 1214C)
+   CPU 1214C + 3 sensores POSICIÓN + banda + 6 solenoides + 3 relés
+   Latch: VisionMaterial==N AND I_Sensor vía N → paro banda + pistón
 ```
+
+Visión / Costa Rica: carpeta [`costa_rica/`](../costa_rica/).
 
 | Modo | Carpeta | CPU | Qué hay en mesa |
 |---|---|---|---|
