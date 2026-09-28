@@ -25,6 +25,13 @@ Bridge HMI (también en la Pi) ↔ Firestore ↔ web Guacamayos
 | `../plc_real/DB_CONTRATO_WEB.md` | `VisionMaterial` Int @ 6.0 |
 | `../plc_real/CHECKLIST.md` | Checklist 2 h |
 
+## Prueba desde la web (sin PLC)
+
+En la app SIBU: nav **📷** → pegá `GEMINI_API_KEY` → cámara o foto → **Identificar**.
+
+Eso llama Gemini desde el navegador (key solo en `localStorage`). **No necesita PLC ni bridge.**  
+En estación real sigue siendo la Pi la que escribe `VisionMaterial` al PLC.
+
 ## Arranque en la Pi 4
 
 ```bash
