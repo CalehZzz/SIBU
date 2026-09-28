@@ -59,19 +59,20 @@ Página SIBU / HMI virtual (KTP700)
 
 ---
 
-## C) `DB_HMI` — número **3** · Optimized **OFF** · ≥ **6 bytes**
+## C) `DB_HMI` — número **3** · Optimized **OFF** · ≥ **8 bytes**
 
 | Nombre | Tipo | Offset | Control web |
 |---|---|---|---|
 | `Start` … `ManualPiston` | Bool | 0.0–0.7 | Operador (`ManualPiston` = P3) |
 | `BasculaLista` | Bool | 1.0 | Sim báscula |
-| `SensorPieza` | Bool | 1.1 | Sim pieza |
-| `SensorPlastico` | Bool | 1.2 | Sim plástico |
-| `SensorAluminio` | Bool | 1.3 | Sim aluminio |
+| `SensorPieza` | Bool | 1.1 | Sim pieza / trigger cámara |
+| `SensorPlastico` | Bool | 1.2 | Sim **posición** vía P1 |
+| `SensorAluminio` | Bool | 1.3 | Sim **posición** vía P2 |
 | `ManualPiston1` | Bool | **1.4** | Manual P1 |
 | `ManualPiston2` | Bool | **1.5** | Manual P2 |
-| `SensorVidrio` | Bool | **1.6** | Sim vidrio |
+| `SensorVidrio` | Bool | **1.6** | Sim **posición** vía P3 |
 | `PesoActualKg` | Real | **2.0** | Peso |
+| **`VisionMaterial`** | **Int** | **6.0** | 0/1/2/3 · Gemini (Pi 4) |
 
 Detalle completo: `tia/MAPA_DB_HMI.md`.
 

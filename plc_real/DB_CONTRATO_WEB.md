@@ -34,20 +34,24 @@ DatosEstacion.PistonOn  := M_Piston1 OR M_Piston2 OR M_Piston3;
 
 ---
 
-## `DB_HMI` — DB **3** · **6 bytes**
+## `DB_HMI` — DB **3** · **8 bytes** (mínimo)
 
 | Offset | Nombre | Uso |
 |---|---|---|
 | 0.0–0.7 | Start…ManualPiston | ManualPiston = **P3 vidrio** |
-| 1.0 | BasculaLista | Sim / real → `I_BasculaLista` |
-| 1.1 | SensorPieza | Sim / real → `I_SensorPieza` |
-| 1.2 | SensorPlastico | Sim / real → `I_SensorPlastico` |
-| 1.3 | SensorAluminio | Sim / real → `I_SensorAluminio` |
+| 1.0 | BasculaLista | Espejo / sim → `I_BasculaLista` |
+| 1.1 | SensorPieza | Espejo / sim → `I_SensorPieza` (trigger cámara) |
+| 1.2 | SensorPlastico | Espejo / sim vía P1 (posición) |
+| 1.3 | SensorAluminio | Espejo / sim vía P2 (posición) |
 | **1.4** | **ManualPiston1** | P1 plástico |
 | **1.5** | **ManualPiston2** | P2 latas |
-| **1.6** | **SensorVidrio** | Sim / real → `I_SensorVidrio` |
+| **1.6** | **SensorVidrio** | Espejo / sim vía P3 (posición) |
 | 1.7 | *(libre)* | reservado |
 | 2.0 | PesoActualKg | Real |
+| **6.0** | **`VisionMaterial`** | **Int** · 0 ninguno · **1** plástico · **2** aluminio · **3** vidrio |
 
-> **Eliminados:** `PistonNExtendido` / `PistonNRetractado` (no hay FC).  
-> Si tu DB3 aún tiene campos viejos @ 6.x, bórralos o déjalos sin usar; el bridge ya no los escribe. Tamaño mínimo **6 bytes**.
+> **Visión (Pi 4 + Gemini):** escribe solo `VisionMaterial` @ 6.0.  
+> **Bridge HMI:** escribe bytes 0–5 (no pisa el Int @ 6).  
+> **PLC:** pone `VisionMaterial := 0` al terminar el empuje o por timeout.  
+> Optimized **OFF**. Tamaño mínimo **8 bytes**.  
+> **Eliminados:** `PistonNExtendido` / `PistonNRetractado` (no hay FC).

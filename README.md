@@ -36,6 +36,13 @@ Estación Firestore: `colegio-don-bosco-real`.
 Hardware: **3 pistones doble efecto** — 6 solenoides Ext/Ret · P1 plástico · P2 latas · P3 vidrio.  
 Semáforo vía relés (`1L`/`2L` = 24 V). Operador: **solo web** — ver `plc_real/TABLA_IO_1214C.md`.
 
+### Visión Gemini (Raspberry Pi 4) — Costa Rica
+
+Los 3 sensores físicos son **posición** por vía. Gemini identifica el material → `DB_HMI.VisionMaterial`.  
+El PLC **solo para la banda** cuando `VisionMaterial==N` **y** el sensor de esa vía se activa.
+
+Ver [`costa_rica/`](costa_rica/) · ladder [`plc_real/NETWORKS_LAD.md`](plc_real/NETWORKS_LAD.md) · qué falta: [`costa_rica/QUE_NECESITO_GEMINI.md`](costa_rica/QUE_NECESITO_GEMINI.md).
+
 ## App
 
 - `index.html` — usuario en estación (plástico + latas + vidrio) + HMI desde la estación

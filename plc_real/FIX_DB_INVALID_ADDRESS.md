@@ -18,7 +18,7 @@ py plc_probe.py --ip 192.168.0.10
 ```
 
 - **DB1** ≥ **28** → `DatosEstacion`
-- **DB3** ≥ **6** → `DB_HMI`
+- **DB3** ≥ **8** → `DB_HMI` (incluye `VisionMaterial` Int @ 6.0)
 
 ---
 
@@ -35,10 +35,11 @@ py plc_probe.py --ip 192.168.0.10
 | **1.5** | **ManualPiston2** | Bool |
 | **1.6** | **SensorVidrio** | Bool |
 | **2.0** | **PesoActualKg** | **Real** |
+| **6.0** | **VisionMaterial** | **Int** (0/1/2/3) |
 
 3. **No** crear `PistonNExtendido` / `PistonNRetractado` (pistones sin FC).  
    Si existen del diseño viejo, elimínalos del DB.
-4. Tamaño **≥ 6 bytes** → Download + RUN
+4. Tamaño **≥ 8 bytes** (`VisionMaterial` @ 6.0) → Download + RUN
 
 ---
 
