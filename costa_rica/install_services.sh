@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
-# Instala servicios systemd en la Pi para que corran sin PC.
-# Uso:
-#   cd ~/SIBU
-#   bash costa_rica/install_services.sh          # solo vision-http (recomendado hoy)
-#   bash costa_rica/install_services.sh all      # http + bridge + vision-plc (cuando TIA OK)
+# Instala servicios systemd en la Pi (corren sin PC).
+#   bash costa_rica/install_services.sh web     # RECOMENDADO: visión vía Firestore (página SIBU)
+#   bash costa_rica/install_services.sh http    # opcional :8080 LAN
+#   bash costa_rica/install_services.sh all     # web + bridge + vision-plc (cuando TIA OK)
+#   bash costa_rica/install_services.sh stop
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-MODE="${1:-http}"
+MODE="${1:-web}"
 
 if [[ ! -f "$ROOT/costa_rica/sibu.env" ]]; then
   echo "Creá costa_rica/sibu.env primero:"
   echo "  cp costa_rica/sibu.env.example costa_rica/sibu.env && nano costa_rica/sibu.env"
+  exit 1
+fi
+
+if [[ ! -f "$ROOT/serviceAccountKey.json" ]]; then
+  echo "Falta serviceAccountKey.json en $ROOT (necesario para vision_firebase / bridge)"
   exit 1
 fi
 
@@ -25,23 +30,31 @@ enable_one() {
 }
 
 case "$MODE" in
+  web)
+    echo ">>> Visión vía Firestore (página SIBU 📷, sin :8080)"
+    sudo systemctl disable --now sibu-vision-http.service 2>/dev/null || true
+    enable_one sibu-vision-firebase.service
+    ;;
   http)
-    echo ">>> Solo vision-http (sin Firebase, sin PLC)"
+    echo ">>> Solo vision-http :8080 (misma LAN)"
     enable_one sibu-vision-http.service
-    echo "Web: http://$(hostname -I | awk '{print $1}'):8080/"
     ;;
   all)
-    echo ">>> http + bridge + vision-plc"
-    enable_one sibu-vision-http.service
+    echo ">>> firebase vision + bridge + vision-plc"
+    enable_one sibu-vision-firebase.service
     enable_one sibu-bridge.service
     enable_one sibu-vision-plc.service
     ;;
   stop)
-    sudo systemctl disable --now sibu-vision-http.service sibu-bridge.service sibu-vision-plc.service 2>/dev/null || true
+    sudo systemctl disable --now \
+      sibu-vision-http.service \
+      sibu-vision-firebase.service \
+      sibu-bridge.service \
+      sibu-vision-plc.service 2>/dev/null || true
     echo "Servicios detenidos"
     ;;
   *)
-    echo "Uso: $0 [http|all|stop]"
+    echo "Uso: $0 [web|http|all|stop]"
     exit 1
     ;;
 esac

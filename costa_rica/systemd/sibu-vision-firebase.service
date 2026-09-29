@@ -1,0 +1,16 @@
+[Unit]
+Description=SIBU vision via Firestore (web page camera/Gemini)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sibucr
+WorkingDirectory=/home/sibucr/SIBU
+EnvironmentFile=-/home/sibucr/SIBU/costa_rica/sibu.env
+ExecStart=/home/sibucr/SIBU/.venv/bin/python costa_rica/vision_firebase.py --model ${GEMINI_MODEL}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
