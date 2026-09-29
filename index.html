@@ -2022,11 +2022,12 @@ const PLC_DEFAULT = {
    ------------------------------------------------------------------------- */
 let currentUser = null;
 let isAdmin = false;
-const ADMIN_EMAILS = new Set(["guacamayos2026@gmail.com"]);
+/** Acceso total temporal (admin + sin candado RFID) */
+const FULL_ACCESS_EMAILS = new Set(["guacamayos2026@gmail.com"]);
 
-function emailIsAdmin(user){
+function emailHasFullAccess(user){
   const em = (user && user.email ? String(user.email) : "").trim().toLowerCase();
-  return !!em && ADMIN_EMAILS.has(em);
+  return !!em && FULL_ACCESS_EMAILS.has(em);
 }
 let precios = { ...PRECIOS_POR_DEFECTO };
 let estaciones = [];
@@ -2284,11 +2285,15 @@ onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     try{
       const tokenResult = await user.getIdTokenResult(true);
-      isAdmin = tokenResult.claims.admin === true || emailIsAdmin(user);
+      isAdmin = tokenResult.claims.admin === true || emailHasFullAccess(user);
     }catch(e){
-      isAdmin = emailIsAdmin(user);
+      isAdmin = emailHasFullAccess(user);
     }
     $("nav-admin")?.classList.toggle("hidden", !isAdmin);
+    if(emailHasFullAccess(user)){
+      updateRfidPill();
+      toast("Acceso total · " + user.email);
+    }
     $("btn-logout")?.classList.remove("hidden");
 
     let nombre = user.displayName;
@@ -2392,6 +2397,7 @@ let rfidModalOpenedAt = 0;
 let rfidScanHint = null; // último mensaje del lector
 
 function isRfidUnlocked(){
+  if(emailHasFullAccess(currentUser)) return true;
   return !!(rfidState.unlocked && rfidState.untilMs && Date.now() < rfidState.untilMs);
 }
 
@@ -2528,6 +2534,12 @@ function showRfidLock(on, mode){
 function updateRfidPill(){
   const pill = $("rfid-pill");
   if(!pill) return;
+  if(emailHasFullAccess(currentUser)){
+    pill.classList.add("on");
+    pill.classList.remove("wait");
+    pill.textContent = "🔓 Full access";
+    return;
+  }
   const ok = isRfidUnlocked();
   pill.classList.toggle("on", ok);
   pill.classList.toggle("wait", !ok && rfidLinking);
