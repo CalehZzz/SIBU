@@ -1800,8 +1800,8 @@
         <div class="card real-card" id="bins-panel">
           <div class="section-title">Botes + báscula · ESP32 (demo)</div>
           <p style="font-size:13px; color:var(--forest-soft); line-height:1.45; margin:0 0 10px;">
-            En esta demo solo está conectado el bote de <b>plástico</b> (HC-SR04 + LCD + báscula HX711).
-            Aluminio, vidrio y rechazo aparecen como <b>desconectados</b> hasta cablearlos.
+            Conectados: HC <b>plástico</b> + HC <b>rechazo</b>, LCD (solo plástico) y báscula HX711.
+            Aluminio y vidrio están <b>desconectados</b> en esta demo.
           </p>
           <div class="bins-lamp green" id="bins-lamp"><span class="dot"></span><span id="bins-lamp-text">Esperando ESP32…</span></div>
           <div class="bins-peso-box">
@@ -1813,13 +1813,13 @@
               <div class="bin-name">🥤 Plástico <span class="bin-badge on">En línea</span></div>
               <div class="bin-pct" id="bin-plastico-pct">—%</div>
               <div class="bin-bar"><span id="bin-plastico-bar"></span></div>
-              <div class="bin-meta" id="bin-plastico-meta">Sin datos</div>
+              <div class="bin-meta" id="bin-plastico-meta">HC + LCD + báscula</div>
             </div>
-            <div class="bin-card off" id="bin-rechazo">
-              <div class="bin-name">🚫 Rechazo <span class="bin-badge off">Desconectado</span></div>
-              <div class="bin-pct" id="bin-rechazo-pct">—</div>
+            <div class="bin-card" id="bin-rechazo">
+              <div class="bin-name">🚫 Rechazo <span class="bin-badge on">En línea</span></div>
+              <div class="bin-pct" id="bin-rechazo-pct">—%</div>
               <div class="bin-bar"><span id="bin-rechazo-bar"></span></div>
-              <div class="bin-meta" id="bin-rechazo-meta">Sensor no cableado</div>
+              <div class="bin-meta" id="bin-rechazo-meta">HC conectado · sin LCD</div>
             </div>
             <div class="bin-card off" id="bin-aluminio">
               <div class="bin-name">🥫 Aluminio <span class="bin-badge off">Desconectado</span></div>
@@ -3289,31 +3289,47 @@ function renderBinsPanel(raw){
   const lamp = $("bins-lamp");
   const lampTxt = $("bins-lamp-text");
   const st = $("bins-status");
-  // Solo plástico en línea en esta demo
+  // Demo: plástico + rechazo en línea; aluminio/vidrio desconectados
   paintBin("aluminio", null, { offline: true });
   paintBin("vidrio", null, { offline: true });
-  paintBin("rechazo", null, { offline: true });
 
   if(!raw){
     lamp?.classList.remove("green","yellow","red");
     lamp?.classList.add("green");
     if(lampTxt) lampTxt.textContent = "Sin datos — ¿ESP32 + sibu-bins?";
     paintBin("plastico", null, { offline: false });
+    paintBin("rechazo", null, { offline: false });
     if($("bin-plastico-meta")) $("bin-plastico-meta").textContent = "Esperando telemetría…";
+    if($("bin-rechazo-meta")) $("bin-rechazo-meta").textContent = "Esperando telemetría…";
     if($("bins-peso")) $("bins-peso").textContent = "— kg";
     if(st) st.textContent = "Firestore bins_pi/estado vacío";
     return;
   }
   const p = raw.plastico || {};
+  const r = raw.rechazo || {};
   const llenoP = !!p.lleno;
+  const llenoR = !!r.lleno;
   lamp?.classList.remove("green","yellow","red");
-  lamp?.classList.add(llenoP ? "yellow" : "green");
-  if(lampTxt){
-    lampTxt.textContent = llenoP
-      ? "Plástico LLENO · (rechazo/otros desconectados en demo)"
-      : "Plástico en línea · resto desconectado";
+  let color = "green";
+  let msg = "Plástico + rechazo en línea · A/V desconectados";
+  if(llenoR){
+    color = "red";
+    msg = "STOP · bote de rechazo LLENO";
+  } else if(llenoP){
+    color = "yellow";
+    msg = "Plástico LLENO · desvío a rechazo";
   }
+  lamp?.classList.add(color);
+  if(lampTxt) lampTxt.textContent = msg;
   paintBin("plastico", p, { offline: false });
+  paintBin("rechazo", r, { offline: false, isRechazo: true });
+  if($("bin-rechazo-meta") && !llenoR){
+    const cm = r.cm;
+    const base = (cm != null && cm >= 0) ? `${Number(cm).toFixed(1)} cm` : ($("bin-rechazo-meta").textContent || "");
+    if(!$("bin-rechazo-meta").textContent.includes("LCD")){
+      $("bin-rechazo-meta").textContent = (base || "HC ok") + " · sin LCD";
+    }
+  }
   const pesoEl = $("bins-peso");
   if(pesoEl){
     const kg = raw.pesoKg;
@@ -3323,7 +3339,7 @@ function renderBinsPanel(raw){
   }
   if(st){
     st.textContent = raw.online
-      ? ("Plástico en vivo · " + (raw.atMs ? new Date(raw.atMs).toLocaleTimeString() : ""))
+      ? ("P + rechazo en vivo · " + (raw.atMs ? new Date(raw.atMs).toLocaleTimeString() : ""))
       : "Último frame recibido";
   }
 }
