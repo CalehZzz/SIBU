@@ -56,6 +56,13 @@ service cloud.firestore {
       allow read, write: if signedIn() && request.auth.uid == uid;
     }
 
+    // Último tap del lector (feedback UI). Solo la Pi escribe (Admin SDK).
+    match /rfid_scan/{doc} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // Vínculo permanente tarjeta → cuenta. Solo el dueño lee; Pi escribe.
     match /rfid_tarjetas/{cardUid} {
       allow read: if signedIn() && resource.data.authUid == request.auth.uid;
       allow write: if isAdmin();

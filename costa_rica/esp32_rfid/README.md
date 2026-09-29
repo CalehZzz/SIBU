@@ -45,15 +45,26 @@ curl -X POST http://127.0.0.1:8081/api/rfid -H 'Content-Type: application/json' 
 # Tras Vincular en la web (o con authUid en allowlist) → 200 + authUid
 ```
 
-## 2) Primera vez — vincular tarjeta a tu Google
+## 2) Primera vez — vincular tarjeta a tu Google (permanente)
 
-1. Entrá a SIBU con tu cuenta Google.
+1. Entrá a SIBU con tu cuenta Google (se muestra el **correo** en el modal).
 2. Tocá el pill **🔒 RFID** (o intentá abrir HMI/📷/🔌).
 3. Pulsá **Vincular mi tarjeta**.
 4. En ≤ 90 s acercá la tarjeta al RC522.
-5. Listo: esa tarjeta solo abre **tu** cuenta.
+5. Queda **para siempre** en esa cuenta: otra cuenta no puede usarla ni re-vincularla.
 
-El UID de Auth aparece en el modal (código mono). Podés copiarlo a `rfid_allow.txt` como tercer campo.
+Si acercás la tarjeta sin vincular, la web ahora muestra el feedback del lector
+(`rfid_scan/last`): p.ej. “Leí A724… — tocá Vincular”.
+
+En el Serial del ESP32 deberías ver `POST … → 200` (no solo el UID).
+Si ves `403`, la Pi recibió el tap pero rechazó (falta vincular / otra cuenta).
+
+Reiniciá el servicio tras `git pull`:
+
+```bash
+sudo systemctl restart sibu-rfid-gate
+journalctl -u sibu-rfid-gate -f
+```
 
 ## 3) ESP32
 

@@ -1834,7 +1834,7 @@
     <h2 id="rfid-title">Acceso de estación</h2>
     <p class="rfid-lead" id="rfid-lead">Solo <b>tu</b> cuenta Google + <b>tu</b> tarjeta abren HMI, cámara y PLC.</p>
     <ul class="rfid-steps" id="rfid-steps">
-      <li class="active" id="rfid-step-wait"><span class="n">1</span><span><b>Acercá tu tarjeta</b> al lector RC522</span></li>
+      <li class="active" id="rfid-step-wait"><span class="n">1</span><span><b>Primera vez:</b> Vincular · luego acercá la tarjeta</span></li>
       <li id="rfid-step-ok"><span class="n">2</span><span><b>Entrá</b> al panel (HMI / cámara / PLC)</span></li>
       <li id="rfid-step-lock"><span class="n">3</span><span><b>Bloqueá</b> al terminar — o esperá a que expire</span></li>
     </ul>
@@ -1842,8 +1842,11 @@
     <div class="rfid-countdown hidden" id="rfid-countdown">—</div>
     <p class="rfid-mode-hint" id="rfid-lock-msg">Esperando tu tarjeta…</p>
     <div class="rfid-account" id="rfid-account">
-      <span class="lab">Tu cuenta</span>
-      <span id="rfid-account-name">—</span><br>
+      <span class="lab">Correo</span>
+      <span id="rfid-account-email">—</span>
+      <span class="lab" style="margin-top:8px;">Nombre</span>
+      <span id="rfid-account-name">—</span>
+      <span class="lab" style="margin-top:8px;">Auth UID</span>
       <code id="rfid-account-uid">—</code>
     </div>
     <div class="btn-row" style="margin-top:10px; flex-wrap:wrap;">
@@ -2259,8 +2262,8 @@ document.querySelectorAll(".navpills .pill[data-view]").forEach(btn => {
 });
 
 /* -------------------------------------------------------------------------
-   RFID GATE — por CUENTA Google (rfid_gate/{authUid})
-   ESP32 → Pi :8081 → desbloquea SOLO el doc del operador dueño de la tarjeta
+   RFID GATE — por CUENTA Google (vínculo permanente y exclusivo)
+   ESP32 → Pi :8081 → rfid_gate/{authUid} + rfid_scan/last (feedback)
    ------------------------------------------------------------------------- */
 const RFID_PROTECTED = new Set(["hmi", "vision", "plc-real"]);
 const RFID_GATE_REF = () => {
@@ -2271,15 +2274,20 @@ const RFID_LINK_REF = () => {
   if(!currentUser) throw new Error("sin sesión");
   return doc(db, "rfid_link_pending", currentUser.uid);
 };
+const RFID_SCAN_REF = () => doc(db, "rfid_scan", "last");
 
 let rfidUnsub = null;
+let rfidScanUnsub = null;
+let rfidLinkUnsub = null;
 let rfidListenUid = null;
-let rfidState = { unlocked: false, untilMs: 0, nombre: null, cardUid: null };
+let rfidState = { unlocked: false, untilMs: 0, nombre: null, email: null, cardUid: null };
 let rfidPendingView = null;
 let rfidExpireTimer = null;
 let rfidLinking = false;
 let rfidLinkTimer = null;
 let rfidUiMode = "wait"; // wait | link | session
+let rfidModalOpenedAt = 0;
+let rfidScanHint = null; // último mensaje del lector
 
 function isRfidUnlocked(){
   return !!(rfidState.unlocked && rfidState.untilMs && Date.now() < rfidState.untilMs);
@@ -2295,6 +2303,10 @@ function fmtRfidTime(sec){
   return m > 0 ? `${m}:${String(s).padStart(2,"0")}` : `${s}s`;
 }
 
+function rfidEmail(){
+  return (currentUser && (currentUser.email || "")) || "";
+}
+
 function setRfidSteps(mode){
   const wait = $("rfid-step-wait");
   const ok = $("rfid-step-ok");
@@ -2302,7 +2314,8 @@ function setRfidSteps(mode){
   [wait, ok, lock].forEach(el => el?.classList.remove("active","done","warn"));
   if(mode === "link"){
     wait?.classList.add("warn");
-    if(wait) wait.querySelector("span:last-child").innerHTML = "<b>Acercá la tarjeta</b> para vincularla a esta cuenta";
+    if(wait) wait.querySelector("span:last-child").innerHTML =
+      "<b>Acercá la tarjeta</b> — queda <b>para siempre</b> en este correo";
   } else if(mode === "session"){
     wait?.classList.add("done");
     ok?.classList.add("done");
@@ -2310,19 +2323,23 @@ function setRfidSteps(mode){
     if(wait) wait.querySelector("span:last-child").innerHTML = "<b>Tarjeta leída</b> — acceso abierto";
   } else {
     wait?.classList.add("active");
-    if(wait) wait.querySelector("span:last-child").innerHTML = "<b>Acercá tu tarjeta</b> al lector RC522";
+    if(wait) wait.querySelector("span:last-child").innerHTML =
+      "<b>Primera vez:</b> Vincular · después solo acercá tu tarjeta";
   }
 }
 
 function paintRfidAccount(){
+  const emailEl = $("rfid-account-email");
   const nameEl = $("rfid-account-name");
   const uidEl = $("rfid-account-uid");
   if(!currentUser){
+    if(emailEl) emailEl.textContent = "—";
     if(nameEl) nameEl.textContent = "—";
     if(uidEl) uidEl.textContent = "—";
     return;
   }
-  if(nameEl) nameEl.textContent = currentUser.displayName || currentUser.email || "Operador";
+  if(emailEl) emailEl.textContent = currentUser.email || "(sin correo)";
+  if(nameEl) nameEl.textContent = currentUser.displayName || "Operador";
   if(uidEl) uidEl.textContent = currentUser.uid;
 }
 
@@ -2340,6 +2357,7 @@ function paintRfidUi(forceMode){
   const btnLink = $("btn-rfid-link");
   const btnLock = $("btn-rfid-lock");
   const btnCancel = $("btn-rfid-cancel");
+  const mail = rfidEmail();
 
   paintRfidAccount();
   setRfidSteps(mode);
@@ -2347,7 +2365,9 @@ function paintRfidUi(forceMode){
 
   if(mode === "session"){
     if(title) title.textContent = "Sesión abierta";
-    if(lead) lead.innerHTML = "Esta sesión es <b>solo tuya</b>. Al terminar, bloqueá el acceso.";
+    if(lead) lead.innerHTML = mail
+      ? `Sesión de <b>${mail}</b>. Al terminar, bloqueá el acceso.`
+      : "Esta sesión es <b>solo tuya</b>. Al terminar, bloqueá el acceso.";
     if(ico) ico.textContent = "✅";
     pulse?.classList.add("session");
     if(pulse) pulse.textContent = "🔓";
@@ -2355,7 +2375,7 @@ function paintRfidUi(forceMode){
     cd?.classList.remove("hidden");
     cd?.classList.toggle("warn", left <= 30);
     if(cd) cd.textContent = fmtRfidTime(left);
-    if(msg) msg.textContent = (rfidState.nombre || "Operador")
+    if(msg) msg.textContent = (rfidState.email || mail || rfidState.nombre || "Operador")
       + (rfidState.cardUid ? ` · tarjeta ${rfidState.cardUid}` : "")
       + " · expira sola si no bloqueás";
     btnLock?.classList.remove("hidden");
@@ -2363,22 +2383,27 @@ function paintRfidUi(forceMode){
     if(btnCancel) btnCancel.textContent = "Seguir trabajando";
   } else if(mode === "link"){
     if(title) title.textContent = "Vinculando tarjeta";
-    if(lead) lead.innerHTML = "Acercá <b>tu</b> tarjeta al RC522 en los próximos 90 s. Quedará unida a esta cuenta Google.";
+    if(lead) lead.innerHTML = mail
+      ? `Vinculando a <b>${mail}</b>. La tarjeta quedará <b>solo</b> para esta cuenta (permanente).`
+      : "Acercá <b>tu</b> tarjeta. Quedará unida <b>para siempre</b> a esta cuenta.";
     if(ico) ico.textContent = "🔗";
     pulse?.classList.add("link");
     if(pulse) pulse.textContent = "📡";
     cd?.classList.add("hidden");
-    if(msg) msg.textContent = "Esperando tap para vincular…";
+    if(msg) msg.textContent = rfidScanHint || ("Esperando tap para vincular a " + (mail || "tu cuenta") + "…");
     btnLock?.classList.add("hidden");
     btnLink?.classList.add("hidden");
     if(btnCancel) btnCancel.textContent = "Cancelar vínculo";
   } else {
     if(title) title.textContent = "Acceso de estación";
-    if(lead) lead.innerHTML = "Solo <b>tu</b> cuenta Google + <b>tu</b> tarjeta abren HMI, cámara y PLC.";
+    if(lead) lead.innerHTML = mail
+      ? `Cuenta <b>${mail}</b>: solo tu tarjeta vinculada abre HMI, cámara y PLC.`
+      : "Solo <b>tu</b> cuenta Google + <b>tu</b> tarjeta abren HMI, cámara y PLC.";
     if(ico) ico.textContent = "💳";
     if(pulse) pulse.textContent = "📡";
     cd?.classList.add("hidden");
-    if(msg) msg.textContent = "Esperando tu tarjeta…";
+    if(msg) msg.textContent = rfidScanHint
+      || "Si es la primera vez, tocá Vincular mi tarjeta · si ya vinculaste, acercá la tarjeta";
     btnLock?.classList.add("hidden");
     btnLink?.classList.remove("hidden");
     if(btnCancel) btnCancel.textContent = "Cancelar";
@@ -2391,6 +2416,8 @@ function showRfidLock(on, mode){
   el.classList.toggle("show", !!on);
   el.setAttribute("aria-hidden", on ? "false" : "true");
   if(on){
+    rfidModalOpenedAt = Date.now();
+    rfidScanHint = null;
     ensureRfidListen();
     paintRfidUi(mode || (isRfidUnlocked() ? "session" : (rfidLinking ? "link" : "wait")));
   }
@@ -2438,14 +2465,53 @@ function scheduleRfidExpire(){
 }
 
 function stopRfidListen(){
-  if(rfidUnsub){
-    try{ rfidUnsub(); }catch(e){}
-    rfidUnsub = null;
-  }
+  if(rfidUnsub){ try{ rfidUnsub(); }catch(e){} rfidUnsub = null; }
+  if(rfidScanUnsub){ try{ rfidScanUnsub(); }catch(e){} rfidScanUnsub = null; }
+  if(rfidLinkUnsub){ try{ rfidLinkUnsub(); }catch(e){} rfidLinkUnsub = null; }
   rfidListenUid = null;
-  rfidState = { unlocked: false, untilMs: 0, nombre: null, cardUid: null };
+  rfidState = { unlocked: false, untilMs: 0, nombre: null, email: null, cardUid: null };
   if(rfidExpireTimer){ clearInterval(rfidExpireTimer); rfidExpireTimer = null; }
   updateRfidPill();
+}
+
+function onRfidScanSnap(snap){
+  if(!snap.exists()) return;
+  if(!$("rfid-lock")?.classList.contains("show")) return;
+  const d = snap.data() || {};
+  const atMs = Number(d.atMs) || 0;
+  // ignorar lecturas anteriores a abrir el modal (con holgura)
+  if(atMs && rfidModalOpenedAt && atMs < rfidModalOpenedAt - 2000) return;
+
+  const card = d.cardUid || "?";
+  const mail = rfidEmail();
+
+  if(d.ok && d.authUid && currentUser && d.authUid === currentUser.uid){
+    rfidScanHint = d.linked
+      ? `Tarjeta ${card} vinculada a ${d.email || mail || "tu cuenta"}`
+      : `Tarjeta ${card} reconocida`;
+    // el gate listener abre la sesión
+    if($("rfid-lock-msg") && !isRfidUnlocked()){
+      $("rfid-lock-msg").textContent = rfidScanHint;
+    }
+    return;
+  }
+
+  if(d.ok && d.authUid && currentUser && d.authUid !== currentUser.uid){
+    rfidScanHint = `Tarjeta ${card} es de otra cuenta` + (d.email ? ` (${d.email})` : "") + " — no te desbloquea";
+    toast(rfidScanHint);
+  } else if(d.needsLink || (d.error && String(d.error).toLowerCase().includes("vincular"))){
+    rfidScanHint = `Leí ${card}: aún no está vinculada a ${mail || "tu cuenta"}. Tocá Vincular mi tarjeta`;
+    toast("Tarjeta leída — falta vincularla a tu correo");
+  } else if(d.error){
+    rfidScanHint = String(d.error);
+    toast(rfidScanHint);
+  } else {
+    rfidScanHint = `Lectura ${card}`;
+  }
+
+  if($("rfid-lock")?.classList.contains("show") && !isRfidUnlocked()){
+    paintRfidUi(rfidLinking ? "link" : "wait");
+  }
 }
 
 function ensureRfidListen(){
@@ -2453,6 +2519,7 @@ function ensureRfidListen(){
   if(rfidUnsub && rfidListenUid === currentUser.uid) return;
   stopRfidListen();
   rfidListenUid = currentUser.uid;
+
   rfidUnsub = onSnapshot(RFID_GATE_REF(), (snap) => {
     const d = snap.exists() ? (snap.data() || {}) : {};
     const was = isRfidUnlocked();
@@ -2460,11 +2527,13 @@ function ensureRfidListen(){
       unlocked: !!d.unlocked,
       untilMs: Number(d.untilMs) || 0,
       nombre: d.nombre || null,
+      email: d.email || null,
       cardUid: d.cardUid || null
     };
     updateRfidPill();
     if(isRfidUnlocked()){
       rfidLinking = false;
+      rfidScanHint = null;
       if(rfidLinkTimer){ clearTimeout(rfidLinkTimer); rfidLinkTimer = null; }
       scheduleRfidExpire();
       if(rfidPendingView){
@@ -2474,20 +2543,37 @@ function ensureRfidListen(){
         if(next === "plc-real") ensureRealListen();
         if(next === "hmi") ensureHmiListen();
         showAppView(next);
-        toast("Acceso · " + (rfidState.nombre || "OK"));
+        toast("Acceso · " + (rfidState.email || rfidState.nombre || "OK"));
       } else if($("rfid-lock")?.classList.contains("show")){
         paintRfidUi("session");
       } else if(!was){
-        toast("RFID · " + (rfidState.nombre || "desbloqueado"));
+        toast("RFID · " + (rfidState.email || rfidState.nombre || "desbloqueado"));
       }
-    } else if($("rfid-lock")?.classList.contains("show")){
-      paintRfidUi(rfidLinking ? "link" : "wait");
     }
   }, (err) => {
     console.error(err);
     const msg = $("rfid-lock-msg");
     if(msg) msg.textContent = "Firestore RFID: " + (err.message || err);
   });
+
+  rfidScanUnsub = onSnapshot(RFID_SCAN_REF(), onRfidScanSnap, (err) => {
+    console.warn("rfid_scan:", err.message || err);
+  });
+
+  rfidLinkUnsub = onSnapshot(RFID_LINK_REF(), (snap) => {
+    if(!snap.exists() || !rfidLinking) return;
+    const d = snap.data() || {};
+    if(d.error){
+      rfidScanHint = String(d.error);
+      rfidLinking = false;
+      if(rfidLinkTimer){ clearTimeout(rfidLinkTimer); rfidLinkTimer = null; }
+      updateRfidPill();
+      paintRfidUi("wait");
+      toast(rfidScanHint);
+    } else if(d.done && d.cardUid){
+      rfidScanHint = `Vinculada ${d.cardUid} → ${d.email || rfidEmail()}`;
+    }
+  }, (err) => console.warn("rfid_link:", err.message || err));
 }
 
 async function cancelRfidLink(){
@@ -2495,25 +2581,29 @@ async function cancelRfidLink(){
   if(rfidLinkTimer){ clearTimeout(rfidLinkTimer); rfidLinkTimer = null; }
   if(!currentUser) return;
   try{
-    await setDoc(RFID_LINK_REF(), {
-      authUid: currentUser.uid,
-      expiresMs: 0,
-      cancelled: true,
-      at: serverTimestamp()
-    }, { merge: true });
-  }catch(e){ /* ignore */ }
+    await deleteDoc(RFID_LINK_REF());
+  }catch(e){
+    try{
+      await setDoc(RFID_LINK_REF(), {
+        authUid: currentUser.uid,
+        expiresMs: 0,
+        cancelled: true,
+        at: serverTimestamp()
+      }, { merge: true });
+    }catch(_e){ /* ignore */ }
+  }
 }
 
 $("btn-rfid-cancel")?.addEventListener("click", async () => {
   if(rfidLinking){
     await cancelRfidLink();
+    rfidScanHint = null;
     paintRfidUi("wait");
     updateRfidPill();
     toast("Vínculo cancelado");
     return;
   }
   if(isRfidUnlocked()){
-    // "Seguir trabajando" — solo cierra el modal
     showRfidLock(false);
     return;
   }
@@ -2529,13 +2619,20 @@ $("btn-rfid-link")?.addEventListener("click", async () => {
   }
   try{
     const expiresMs = Date.now() + 90_000;
+    const email = currentUser.email || "";
     await setDoc(RFID_LINK_REF(), {
       authUid: currentUser.uid,
-      nombre: currentUser.displayName || currentUser.email || "Operador",
+      email,
+      nombre: currentUser.displayName || email || "Operador",
       expiresMs,
+      done: false,
+      cancelled: false,
+      error: null,
       at: serverTimestamp()
     }, { merge: true });
     rfidLinking = true;
+    rfidScanHint = null;
+    rfidModalOpenedAt = Date.now();
     if(rfidLinkTimer) clearTimeout(rfidLinkTimer);
     rfidLinkTimer = setTimeout(async () => {
       rfidLinking = false;
@@ -2547,7 +2644,7 @@ $("btn-rfid-link")?.addEventListener("click", async () => {
     }, 90_000);
     paintRfidUi("link");
     updateRfidPill();
-    toast("Acercá la tarjeta al lector (90 s)");
+    toast(email ? `Vinculando a ${email} — acercá la tarjeta (90 s)` : "Acercá la tarjeta (90 s)");
   }catch(e){
     console.error(e);
     toast("No se pudo pedir vínculo: " + (e.message || e));
@@ -2565,6 +2662,7 @@ $("btn-rfid-lock")?.addEventListener("click", async () => {
       untilMs: 0,
       cardUid: null,
       nombre: null,
+      email: null,
       authUid: currentUser.uid,
       at: serverTimestamp()
     }, { merge: true });
