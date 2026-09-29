@@ -32,24 +32,36 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def norm_uid(uid: str) -> str:
     u = (uid or "").strip().upper().replace(":", "").replace("-", "").replace(" ", "")
+    u = u.strip('"').strip("'")
     return u
 
 
 def load_allow_env() -> dict[str, str]:
-    """RFID_ALLOW=A1B2C3D4:Operador1,DEADBEEF:Carla"""
-    raw = os.environ.get("RFID_ALLOW", "").strip()
+    """RFID_ALLOW=A1B2C3D4:Operador1,DEADBEEF:Carla  (+ archivo opcional)."""
     out: dict[str, str] = {}
-    if not raw:
-        return out
-    for part in raw.split(","):
-        part = part.strip()
-        if not part:
-            continue
+
+    def add_line(part: str) -> None:
+        part = part.strip().strip('"').strip("'")
+        if not part or part.startswith("#"):
+            return
         if ":" in part:
             uid, name = part.split(":", 1)
             out[norm_uid(uid)] = name.strip() or "Operador"
         else:
             out[norm_uid(part)] = "Operador"
+
+    raw = os.environ.get("RFID_ALLOW", "") or ""
+    # systemd a veces deja comillas
+    raw = raw.strip().strip('"').strip("'")
+    for part in raw.replace(";", ",").split(","):
+        add_line(part)
+
+    # Archivo simple (una tarjeta por línea) — más fácil que pelear con .env
+    allow_file = ROOT / "costa_rica" / "rfid_allow.txt"
+    if allow_file.is_file():
+        for line in allow_file.read_text(encoding="utf-8").splitlines():
+            add_line(line)
+
     return out
 
 

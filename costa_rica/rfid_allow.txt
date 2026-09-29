@@ -1,0 +1,3 @@
+# Una tarjeta por línea: UID_HEX:Nombre
+# UID en hex mayúsculas, sin dos puntos
+A7240B9F:SIBUA
