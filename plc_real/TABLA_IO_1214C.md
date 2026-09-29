@@ -1,6 +1,7 @@
-# I/O — CPU 1214C (3 pistones doble efecto · **sin** FC de posición)
+# I/O — CPU 1214C (3 pistones · **sin espera de peso**)
 
-Operador **100 % web** (`DB_HMI`). En mesa: sensores de material + banda + 3 cilindros **doble efecto** + válvulas **5/2 biestables** (2 solenoides c/u) + semáforo 220 V vía **relés 24 V**.
+Operador **100 % web** (`DB_HMI`). En mesa: sensores de posición + banda + 3 cilindros **doble efecto** + válvulas **5/2 biestables** + semáforo vía **relés**.  
+Báscula solo al **final** (demo / desconocidos) — **poca importancia**, no gatea el ciclo.
 
 | Pistón | Extender | Retractar | Material |
 |---|---|---|---|
@@ -9,22 +10,21 @@ Operador **100 % web** (`DB_HMI`). En mesa: sensores de material + banda + 3 cil
 | **P3** | `Q_Piston3Ext` | `Q_Piston3Ret` | Vidrio |
 
 ```
-  [Entrada] → PARA (M_Pesando) → báscula + cámara Gemini (VisionMaterial 1/2/3/4)
+  [Entrada] I_SensorPieza → foto Gemini (banda SIGUE; no espera peso)
                                       │
-              Vision<>0 + báscula OK → banda sigue
-              espera SOLO el sensor de ESA vía (otros se ignoran):
-                                      ├─ Vision=1 + I_SensorPlastico (detecta-todo, final) → paro + P1
-                                      ├─ Vision=2 + I_SensorAluminio (metal) → paro + P2
+              VisionMaterial 1/2/3/4 mientras avanza
+                                      ├─ Vision=1 + I_SensorPlastico → paro + P1
+                                      ├─ Vision=2 + I_SensorAluminio → paro + P2
                                       ├─ Vision=3 + I_SensorVidrio → paro + P3
-                                      └─ Vision=4 desconocido → pass-through (sin pistón)
+                                      └─ Vision=4 → pass-through → final
+                                           └─ báscula DEMO (opcional, cosmético)
 ```
 
-**La IA manda.** Los sensores pueden activarse varios a la vez; solo cuenta el de la vía pedida por Gemini.  
+**La IA manda.** Los sensores de vía solo confirman posición.  
 Ver `NETWORKS_LAD.md`.
 
-**Sin finales de carrera en pistones:** el ciclo de empuje es por **TON**, no por FC 0 % / 100 %.  
-**Doble efecto biestable:** `Q_…Ext = 1` / `Q_…Ret = 0` → extiende · al revés retracta.  
-**Nunca** energizar Ext y Ret a la vez (interlock en LAD).
+**Sin finales de carrera en pistones:** ciclo por **TON**.  
+**Nunca** energizar Ext y Ret a la vez.
 
 ---
 
@@ -35,29 +35,26 @@ Ver `NETWORKS_LAD.md`.
 | **1L** | `%Q0.0` … `%Q0.4` |
 | **2L** | `%Q0.5` `%Q0.6` `%Q0.7` `%Q1.0` `%Q1.1` |
 
-**Conexión:** `1L` y `2L` → **mismo +24 V**.  
-Banda + 6 solenoides + bobinas de los 3 relés del semáforo a 24 V.
-
-Semáforo (lámparas **220 V**): cada `Q_Lampara*` → bobina 24 V de un relé; el contacto NA conmuta fase 220 V (neutro común). Fusible/breaker aparte en 220 V.
+**Conexión:** `1L` y `2L` → **mismo +24 V**.
 
 ---
 
-## Entradas `%I` (5) — pieza / posición por vía / báscula
+## Entradas `%I` (5)
 
 | Dir | Tag | Hardware | Rol |
 |---|---|---|---|
-| `%I0.0` | `I_SensorPieza` | Óptico / presencia en báscula | Entrada → `(S) M_Pesando` (paro para peso+foto) |
-| `%I0.1` | `I_SensorPlastico` | Óptico **detecta todo** (vía P1, al **final**) | Solo frena si `VisionMaterial==1` |
-| `%I0.2` | `I_SensorAluminio` | Sensor **metal** (vía P2) | Solo frena si `VisionMaterial==2` |
-| `%I0.3` | `I_SensorVidrio` | Sensor **vidrio** (vía P3) | Solo frena si `VisionMaterial==3` |
-| `%I0.4` | `I_BasculaLista` | Báscula lista | Peso válido + fin de `M_Pesando` |
+| `%I0.0` | `I_SensorPieza` | Óptico **entrada** | Trigger cámara / `(S) M_EsperandoVision` — **no** para por peso |
+| `%I0.1` | `I_SensorPlastico` | Óptico vía P1 | Solo frena si `VisionMaterial==1` |
+| `%I0.2` | `I_SensorAluminio` | Metal vía P2 | Solo frena si `VisionMaterial==2` |
+| `%I0.3` | `I_SensorVidrio` | Vidrio vía P3 | Solo frena si `VisionMaterial==3` |
+| `%I0.4` | `I_BasculaFinal` | Báscula al **final** (desconocidos / demo) | **Opcional** · no gatea clasificación |
 
-> Tipo de material = `DB_HMI.VisionMaterial` (Gemini). Otros sensores pueden activarse a la vez: **se ignoran** si no coinciden con la IA.  
-> `VisionMaterial==4` (desconocido) → pass-through, sin pistón.
+> Antes: `I_BasculaLista` + paro `M_Pesando`. **Eliminado** del ciclo.  
+> `VisionMaterial==4` → pass-through; la báscula al final es solo representación.
 
 ---
 
-## Salidas `%Q` (10)
+## Salidas `%Q` (10 de la CPU + **3 contadores físicos**)
 
 | Dir | Tag | Común | Hardware (24 V en el PLC) |
 |---|---|---|---|
@@ -68,22 +65,38 @@ Semáforo (lámparas **220 V**): cada `Q_Lampara*` → bobina 24 V de un relé; 
 | `%Q0.4` | `Q_Piston2Ret` | 1L | Solenoide B — P2 latas |
 | `%Q0.5` | `Q_Piston3Ext` | 2L | Solenoide A — P3 vidrio |
 | `%Q0.6` | `Q_Piston3Ret` | 2L | Solenoide B — P3 vidrio |
-| `%Q0.7` | `Q_LamparaRun` | 2L | Bobina relé → lámpara verde 220 V |
-| `%Q1.0` | `Q_LamparaAlarma` | 2L | Bobina relé → lámpara roja 220 V |
-| `%Q1.1` | `Q_LamparaEmergencia` | 2L | Bobina relé → lámpara amarilla 220 V |
+| `%Q0.7` | `Q_LamparaRun` | 2L | Relé → verde 220 V |
+| `%Q1.0` | `Q_LamparaAlarma` | 2L | Relé → rojo 220 V |
+| `%Q1.1` | `Q_LamparaEmergencia` | 2L | Relé → amarillo 220 V |
+| **`%Q1.2`*** | **`Q_ContPlastico`** | † | **Pulso → contador FÍSICO plástico** |
+| **`%Q1.3`*** | **`Q_ContAluminio`** | † | **Pulso → contador FÍSICO latas** |
+| **`%Q1.4`*** | **`Q_ContVidrio`** | † | **Pulso → contador FÍSICO vidrio** |
+
+\* La 1214C base suele tener solo hasta `%Q1.1` (10 DQ). Para los 3 contadores:
+- agregá módulo **SM 1222** (DQ) o el DO que les den, **o**
+- reasigná 3 salidas libres si el MLFB trae más DQ.
+
+† Común del módulo de salidas (mismo +24 V).
+
+**Contadores:** los que den en mesa (electromecánicos / digitales de pulso).  
+Cada clasificación exitosa → **1 pulso corto** (~100 ms) en `Q_Cont*`.  
+Eso es lo que cuenta en la demo; el Int `DatosEstacion.Cont*` es solo espejo web (opcional).
 
 ---
 
 ## Memorias
 
-`M_SistemaOn` · `M_ModoAuto` · `M_Alarma` · `M_ClasifPlastico` · `M_ClasifAluminio` · `M_ClasifVidrio` · `M_Clasificando`  
-`M_Piston1` / `M_Piston2` / `M_Piston3` = comando “quiero extendido” → derivan `Q_…Ext` / `Q_…Ret`.
+`M_SistemaOn` · `M_ModoAuto` · `M_Alarma` · `M_EsperandoVision`  
+`M_ClasifPlastico` · `M_ClasifAluminio` · `M_ClasifVidrio` · `M_Clasificando` · `M_PassThrough`  
+`M_Piston1/2/3` → `Q_…Ext` / `Q_…Ret`  
+`M_PulsoCont1/2/3` (opcional, si el pulso lo armás con TON)
 
-Timers: `T_EmpujePiston1/2/3` (empuje) · `T_TimeoutVision` (visión sin sensor).
+Timers: `T_EmpujePiston1/2/3` · `T_PulsoCont1/2/3` (~100 ms) · `T_TimeoutVision` · `T_TimeoutVia`
 
 ---
 
 ## DBs
 
-`DatosEstacion` DB1 · `DB_HMI` DB3 (**≥ 8 bytes**, incluye `VisionMaterial` Int @ 6.0) · Optimized **OFF**  
+`DatosEstacion` DB1 · `DB_HMI` DB3 (**≥ 8 bytes**, `VisionMaterial` Int @ 6.0) · Optimized **OFF**  
+`DB_HMI.BasculaLista` @ 1.0 puede quedar como espejo de `I_BasculaFinal` (demo web); **no** usarlo para liberar clasificación.  
 Ver `DB_CONTRATO_WEB.md`.

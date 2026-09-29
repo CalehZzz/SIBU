@@ -59,6 +59,11 @@ systemctl status sibu-vision-firebase
 journalctl -u sibu-vision-firebase -f
 ```
 
-## PLC (mañana con TIA)
+## PLC (TIA desde cero · 1214C)
 
-Ver `plc_real/NETWORKS_LAD.md` · IP tipica PLC `192.168.0.1` · Pi eth0 `192.168.0.20`.
+Ver `plc_real/00_PROYECTO_TIA.md` · `NETWORKS_LAD.md` · `CHECKLIST.md`.
+
+**Lógica actual:** entrada → foto Gemini **con banda en marcha** (no espera peso) → Vision + sensor de vía → pistón.  
+Báscula solo al **final** (desconocidos / demo), poca importancia.
+
+IP tipica PLC `192.168.0.1` · Pi eth0 `192.168.0.20`.
