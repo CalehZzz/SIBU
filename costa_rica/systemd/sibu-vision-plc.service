@@ -1,0 +1,16 @@
+[Unit]
+Description=SIBU vision Gemini -> PLC VisionMaterial
+After=network-online.target sibu-bridge.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sibucr
+WorkingDirectory=/home/sibucr/SIBU
+EnvironmentFile=-/home/sibucr/SIBU/costa_rica/sibu.env
+ExecStart=/home/sibucr/SIBU/.venv/bin/python costa_rica/vision_gemini.py --ip ${PLC_IP} --model ${GEMINI_MODEL}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

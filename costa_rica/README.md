@@ -1,5 +1,35 @@
 # Costa Rica — Visión Gemini + Raspberry Pi 4 + PLC
 
+## Autostart en la Pi (sin PC)
+
+```bash
+cd ~/SIBU
+git pull origin cursor/vision-test-page-c9e3
+cp -n costa_rica/sibu.env.example costa_rica/sibu.env
+nano costa_rica/sibu.env   # GEMINI_API_KEY + PLC_IP
+
+# HOY (sin TIA / sin quemar Firestore): solo cámara+Gemini web
+bash costa_rica/install_services.sh http
+
+# MAÑANA (PUT/GET + DBs OK): los tres
+# bash costa_rica/install_services.sh all
+
+# Parar todo:
+# bash costa_rica/install_services.sh stop
+```
+
+Logs:
+```bash
+journalctl -u sibu-vision-http -f
+journalctl -u sibu-bridge -f
+journalctl -u sibu-vision-plc -f
+```
+
+### Firestore (cuota)
+- `vision_http` / `vision_gemini`: **0** lecturas Firebase.
+- `plc_bridge`: por defecto **1 s** de intervalo; **solo escribe** `sesiones_activas` si cambió el estado.
+- Si el PLC no tiene DBs aún: **no actives el bridge** (sigue haciendo `get` de `hmi_comandos`). Usá `install_services.sh http`.
+
 ## Prueba desde la web (cámara de la Pi, **sin PLC**)
 
 En la Pi (API key ya exportada):
