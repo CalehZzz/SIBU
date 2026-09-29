@@ -16,10 +16,11 @@
 | **1.6** | `SensorVidrio` | Bool | Sim / espejo **posición** vía P3 |
 | 1.7 | *(libre)* | — | reservado |
 | 2.0 | `PesoActualKg` | Real | Peso kg |
-| **6.0** | **`VisionMaterial`** | **Int** | 0 ninguno · **1** plástico · **2** aluminio · **3** vidrio |
+| **6.0** | **`VisionMaterial`** | **Int** | 0 vacío · **1** plástico · **2** aluminio · **3** vidrio · **4** desconocido |
 
 Sin `PistonNExtendido` / `PistonNRetractado`: el ciclo AUTO usa TON de empuje.
 
 **Quién escribe `VisionMaterial`:** solo el servicio en la **Raspberry Pi 4** (Gemini).  
-El bridge HMI escribe bytes 0–5; el PLC lo limpia a 0 al terminar clasificar.  
-Latch real: `VisionMaterial == N` **AND** `I_Sensor…` → paro banda + pistón (ver `plc_real/NETWORKS_LAD.md`).
+El bridge HMI escribe bytes 0–5; el PLC lo limpia a 0 al terminar clasificar o pass-through.  
+Flujo: paro báscula+foto → IA → banda sigue → **solo** el sensor de esa vía para + pistón.  
+`VisionMaterial==4` → deja pasar sin pistón. Ver `plc_real/NETWORKS_LAD.md`.

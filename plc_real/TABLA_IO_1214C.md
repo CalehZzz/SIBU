@@ -9,16 +9,18 @@ Operador **100 % web** (`DB_HMI`). En mesa: sensores de material + banda + 3 cil
 | **P3** | `Q_Piston3Ext` | `Q_Piston3Ret` | Vidrio |
 
 ```
-  [Entrada] → [Báscula] → [Banda] → cámara Gemini (VisionMaterial 1/2/3)
+  [Entrada] → PARA (M_Pesando) → báscula + cámara Gemini (VisionMaterial 1/2/3/4)
                                       │
-              espera sensor de ESA vía:
-                                      ├─ Vision=1 + I_SensorPlastico → paro + P1
-                                      ├─ Vision=2 + I_SensorAluminio → paro + P2
-                                      └─ Vision=3 + I_SensorVidrio   → paro + P3
+              Vision<>0 + báscula OK → banda sigue
+              espera SOLO el sensor de ESA vía (otros se ignoran):
+                                      ├─ Vision=1 + I_SensorPlastico (detecta-todo, final) → paro + P1
+                                      ├─ Vision=2 + I_SensorAluminio (metal) → paro + P2
+                                      ├─ Vision=3 + I_SensorVidrio → paro + P3
+                                      └─ Vision=4 desconocido → pass-through (sin pistón)
 ```
 
-**Los 3 sensores `I_Sensor*` son de posición** (uno por vía/pistón), no identifican el material.  
-La identificación la hace **Gemini → `DB_HMI.VisionMaterial`**. Ver `NETWORKS_LAD.md`.
+**La IA manda.** Los sensores pueden activarse varios a la vez; solo cuenta el de la vía pedida por Gemini.  
+Ver `NETWORKS_LAD.md`.
 
 **Sin finales de carrera en pistones:** el ciclo de empuje es por **TON**, no por FC 0 % / 100 %.  
 **Doble efecto biestable:** `Q_…Ext = 1` / `Q_…Ret = 0` → extiende · al revés retracta.  
@@ -44,14 +46,14 @@ Semáforo (lámparas **220 V**): cada `Q_Lampara*` → bobina 24 V de un relé; 
 
 | Dir | Tag | Hardware | Rol |
 |---|---|---|---|
-| `%I0.0` | `I_SensorPieza` | Óptico entrada | Trigger cámara (Pi) + presencia |
-| `%I0.1` | `I_SensorPlastico` | Óptico vía P1 | Posición: “llegó a chute plástico” |
-| `%I0.2` | `I_SensorAluminio` | Óptico vía P2 | Posición: “llegó a chute latas” |
-| `%I0.3` | `I_SensorVidrio` | Óptico vía P3 | Posición: “llegó a chute vidrio” |
-| `%I0.4` | `I_BasculaLista` | Báscula lista | Peso válido |
+| `%I0.0` | `I_SensorPieza` | Óptico / presencia en báscula | Entrada → `(S) M_Pesando` (paro para peso+foto) |
+| `%I0.1` | `I_SensorPlastico` | Óptico **detecta todo** (vía P1, al **final**) | Solo frena si `VisionMaterial==1` |
+| `%I0.2` | `I_SensorAluminio` | Sensor **metal** (vía P2) | Solo frena si `VisionMaterial==2` |
+| `%I0.3` | `I_SensorVidrio` | Sensor **vidrio** (vía P3) | Solo frena si `VisionMaterial==3` |
+| `%I0.4` | `I_BasculaLista` | Báscula lista | Peso válido + fin de `M_Pesando` |
 
-> **No** hay `I_Piston*Extendido` / `I_Piston*Retractado`.  
-> Tipo de material = `DB_HMI.VisionMaterial` (Gemini), **no** estos `%I`.
+> Tipo de material = `DB_HMI.VisionMaterial` (Gemini). Otros sensores pueden activarse a la vez: **se ignoran** si no coinciden con la IA.  
+> `VisionMaterial==4` (desconocido) → pass-through, sin pistón.
 
 ---
 

@@ -45,6 +45,8 @@ MATERIAL_CODE = {
     "latas": 2,
     "vidrio": 3,
     "glass": 3,
+    "desconocido": 4,
+    "unknown": 4,
 }
 
 PROMPT = (
@@ -146,7 +148,11 @@ def clasificar_gemini(path: str, model_name: str, api_key: str) -> str:
 
 
 def codigo_de_etiqueta(label: str) -> int:
-    return int(MATERIAL_CODE.get(label, 0))
+    """1/2/3 material · 4 desconocido · 0 sin mapear (tratar como 4)."""
+    if not label:
+        return 4
+    code = int(MATERIAL_CODE.get(label, 0))
+    return code if code else 4
 
 
 def main() -> None:
@@ -212,13 +218,11 @@ def main() -> None:
             code = codigo_de_etiqueta(label)
             print(f"   Gemini/mock → '{label}' → VisionMaterial={code}")
 
-            if code == 0:
-                print("   desconocido / no mapeado → no escribo")
-            elif args.dry_run:
+            if args.dry_run:
                 print("   dry-run: no escribo PLC")
             else:
                 escribir_vision(plc, args.db_hmi, code)
-                print("   ✅ escrito en PLC; banda sigue hasta sensor de esa vía")
+                print("   ✅ escrito en PLC (1/2/3 clasifica · 4 pass-through)")
 
         except KeyboardInterrupt:
             print("\nBye")

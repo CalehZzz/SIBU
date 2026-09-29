@@ -41,7 +41,7 @@ DB_READ_FALLBACKS = (28, 24, 22, 20, 18)
 DB_HMI_WRITE_FALLBACKS = (6, 2)
 
 ESTADO_TXT = {0: "idle", 1: "running", 2: "clasificando", 3: "alarma", 4: "emergencia"}
-MATERIAL_TXT = {0: None, 1: "plastico", 2: "aluminio", 3: "vidrio"}
+MATERIAL_TXT = {0: None, 1: "plastico", 2: "aluminio", 3: "vidrio", 4: "desconocido"}
 
 # Avisos repetidos (Invalid address / DB chico) → una vez + recordatorio cada N s
 _warn_state: dict[str, float] = {}

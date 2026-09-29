@@ -42,6 +42,8 @@ MATERIAL_CODE = {
     "latas": 2,
     "vidrio": 3,
     "glass": 3,
+    "desconocido": 4,
+    "unknown": 4,
 }
 
 PROMPT = (
@@ -86,7 +88,10 @@ def clasificar_gemini(path: str, model_name: str, api_key: str) -> str:
 
 
 def codigo_de(label: str) -> int:
-    return int(MATERIAL_CODE.get(label, 0))
+    if not label:
+        return 4
+    code = int(MATERIAL_CODE.get(label, 0))
+    return code if code else 4
 
 
 class VisionHandler(BaseHTTPRequestHandler):

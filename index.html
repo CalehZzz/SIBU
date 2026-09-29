@@ -2280,10 +2280,10 @@ async function identifyVisionPi(){
     if(!res.ok || !json.ok) throw new Error(json.error || ("HTTP " + res.status));
     const code = Number(json.code || json.visionMaterial || 0);
     const label = (json.label || "").toLowerCase();
-    const nice = code === 1 ? "plástico" : code === 2 ? "aluminio / lata" : code === 3 ? "vidrio" : (label || "desconocido");
-    setVisionResult(code ? "ok" : "bad", nice, String(code), "Gemini (Pi) dijo: " + (json.raw || label));
+    const nice = code === 1 ? "plástico" : code === 2 ? "aluminio / lata" : code === 3 ? "vidrio" : code === 4 ? "desconocido (pass-through)" : (label || "desconocido");
+    setVisionResult((code >= 1 && code <= 3) ? "ok" : (code === 4 ? "wait" : "bad"), nice, String(code), "Gemini (Pi) dijo: " + (json.raw || label));
     await refreshVisionSnapshot({ silent: true });
-    toast(code ? ("Detectado: " + nice) : "No reconocido");
+    toast(code === 4 ? "Desconocido — pasaría de largo" : (code ? ("Detectado: " + nice) : "No reconocido"));
   }catch(e){
     console.error(e);
     setVisionResult("bad", "Error", "0", String(e.message || e));
