@@ -2021,7 +2021,12 @@ const PLC_DEFAULT = {
    3. ESTADO GLOBAL
    ------------------------------------------------------------------------- */
 let currentUser = null;
-let isAdmin = false;
+const ADMIN_EMAILS = new Set(["guacamayos2026@gmail.com"]);
+
+function emailIsAdmin(user){
+  const em = (user && user.email ? String(user.email) : "").trim().toLowerCase();
+  return !!em && ADMIN_EMAILS.has(em);
+}
 let precios = { ...PRECIOS_POR_DEFECTO };
 let estaciones = [];
 let sesion = null;        // sesión de pesaje activa
@@ -2278,9 +2283,9 @@ onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     try{
       const tokenResult = await user.getIdTokenResult(true);
-      isAdmin = tokenResult.claims.admin === true;
+      isAdmin = tokenResult.claims.admin === true || emailIsAdmin(user);
     }catch(e){
-      isAdmin = false;
+      isAdmin = emailIsAdmin(user);
     }
     $("nav-admin")?.classList.toggle("hidden", !isAdmin);
     $("btn-logout")?.classList.remove("hidden");
