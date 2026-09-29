@@ -11,10 +11,13 @@
 - [ ] Tag table según `TABLA_IO_1214C.md` (**5 DI** + **10 DQ**)
   - `I_SensorPieza` = entrada (foto); **no** paro por peso
   - `I_BasculaFinal` (`I0.4`) = báscula al **final** (demo); **no** gatea
+- [ ] **3 contadores FÍSICOS** (los que den en mesa) cableados a `Q_ContPlastico/Aluminio/Vidrio`
+  - Si la CPU solo tiene 10 DQ → módulo SM1222 u otra expansión DO
+  - Al fin de cada empuje: **1 pulso ~100 ms** (no solo `ADD` en el DB)
 - [ ] LAD según `NETWORKS_LAD.md`:
   - banda **sigue** tras entrada; solo para en clasif/pistón
   - latch = **VisionMaterial == N AND I_Sensor…**
-  - Al terminar TON: `VisionMaterial := 0`
+  - Al terminar TON: **pulso contador físico** + `VisionMaterial := 0`
 - [ ] `T_TimeoutVision` (ej. 8 s) si hay entrada sin visión → Vision=4
 - [ ] **1L y 2L** al mismo **+24 V**
 - [ ] Download software + CPU RUN
@@ -39,7 +42,8 @@
 ## Prueba integral
 1. START AUTO → banda ON
 2. Pieza entra → `I_SensorPieza` → Pi captura → Gemini → `VisionMaterial=1/2/3/4` (**banda sigue**)
-3. Sensor vía + visión → banda OFF · pistón Ext · TON · Ret · Vision=0 · contador++
-4. Desconocido (4) → pass-through · opcional báscula al final (sin importancia)
+3. Sensor vía + visión → banda OFF · pistón Ext · TON · Ret · **pulso contador FÍSICO** · Vision=0
+4. Desconocido (4) → pass-through · opcional báscula al final (sin importancia) · **sin** pulso de contador de material
 5. Emergencia → paro + limpia visión
 6. **No** hay paso “esperar báscula lista” antes de clasificar
+7. Verificar que el **contador de mesa** incrementó (no solo el número en la web)

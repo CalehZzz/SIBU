@@ -11,8 +11,8 @@ Espejo: `PistonNOn` = comando `M_PistonN`. **Sin** bits de extendido/retractado 
 
 | Offset | Nombre | Tipo | Notas |
 |---|---|---|---|
-| 0.0 | `ContPlastico` | Int | |
-| 2.0 | `ContAluminio` | Int | Latas |
+| 0.0 | `ContPlastico` | Int | Espejo web (opcional). **Conteo real = contador FÍSICO** vía `Q_ContPlastico` |
+| 2.0 | `ContAluminio` | Int | Idem · latas · `Q_ContAluminio` |
 | 4.0 | `PesoPlasticoKg` | Real | |
 | 8.0 | `PesoAluminioKg` | Real | Latas |
 | 12.0 | `PesoActualKg` | Real | |
@@ -22,7 +22,7 @@ Espejo: `PistonNOn` = comando `M_PistonN`. **Sin** bits de extendido/retractado 
 | 17.2 | `Piston3On` | Bool | Vidrio (`M_Piston3`) |
 | 18.0 | `EstadoMaquina` | Int | 0…4 |
 | 20.0 | `UltimoMaterial` | Int | 0 ninguno · 1 plástico · 2 aluminio · **3 vidrio** |
-| 22.0 | `ContVidrio` | Int | |
+| 22.0 | `ContVidrio` | Int | Espejo web · `Q_ContVidrio` |
 | 24.0 | `PesoVidrioKg` | Real | |
 
 ```scl

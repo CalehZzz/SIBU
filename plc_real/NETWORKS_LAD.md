@@ -165,8 +165,27 @@ Podés **omitir** esta red en la demo si no cableás báscula.
 ### NW9–11 — Comando pistón + Ext/Ret
 `M_PistonN` ← ClasifX // Manual; interlock Ext/Ret (nunca ambos a 1).
 
-### NW12–14 — TON empuje → contar + `VisionMaterial := 0`
-Solo para 1/2/3.
+### NW12–14 — TON empuje → **contador FÍSICO** + Vision:=0
+
+Al terminar el empuje (flanco `T_EmpujePistonN.Q`), **no alcanza** con sumar un Int en el DB:
+
+1. Pulso a la salida del contador mecánico / electrónico que te den en mesa  
+2. (Opcional) `ADD 1` en `DatosEstacion.Cont*` solo para espejo web  
+3. `VisionMaterial := 0` · `(R) M_Clasif…`
+
+```
+---|(P) T_EmpujePiston1.Q |----( ) Q_ContPlastico     // pulso contador FÍSICO P1
+---|(P) T_EmpujePiston1.Q |---- ADD 1 → ContPlastico  // espejo web (opcional)
+---|(P) T_EmpujePiston1.Q |---- MOVE 0 → VisionMaterial
+---|(P) T_EmpujePiston1.Q |----(R) M_ClasifPlastico
+```
+
+Igual para P2 → `Q_ContAluminio` / `ContAluminio` · P3 → `Q_ContVidrio` / `ContVidrio`.
+
+**Pulso:** TON corto `T_PulsoCont` PT:=T#100ms (o lo que pida el contador) manteniendo `Q_Cont*` en 1.  
+Muchos contadores 24 V cuentan en flanco; no dejes la salida pegada en 1.
+
+> La fuente de verdad en la demo física es el **contador de mesa**. El Int del DB es solo para la web.
 
 ---
 
@@ -199,6 +218,7 @@ Emergencia: `(R) M_EsperandoVision` + `(R) Clasif*` + `VisionMaterial := 0`.
 | `VisionMaterial := 0` | PLC al terminar empuje, pass-through, timeout o emergencia |
 | `M_EsperandoVision` | PLC (entrada pieza) — **no para banda** |
 | Foto | Pi en flanco `I_SensorPieza` / `M_EsperandoVision` |
+| **Conteo** | **Contador FÍSICO** (`Q_Cont*` pulso). DB `Cont*` = espejo web opcional |
 | Peso | Opcional demo vía `I_BasculaFinal` → web; **no** gatea |
 
 ---

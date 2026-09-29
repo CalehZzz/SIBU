@@ -54,7 +54,7 @@ Ver `NETWORKS_LAD.md`.
 
 ---
 
-## Salidas `%Q` (10)
+## Salidas `%Q` (10 de la CPU + **3 contadores físicos**)
 
 | Dir | Tag | Común | Hardware (24 V en el PLC) |
 |---|---|---|---|
@@ -68,6 +68,19 @@ Ver `NETWORKS_LAD.md`.
 | `%Q0.7` | `Q_LamparaRun` | 2L | Relé → verde 220 V |
 | `%Q1.0` | `Q_LamparaAlarma` | 2L | Relé → rojo 220 V |
 | `%Q1.1` | `Q_LamparaEmergencia` | 2L | Relé → amarillo 220 V |
+| **`%Q1.2`*** | **`Q_ContPlastico`** | † | **Pulso → contador FÍSICO plástico** |
+| **`%Q1.3`*** | **`Q_ContAluminio`** | † | **Pulso → contador FÍSICO latas** |
+| **`%Q1.4`*** | **`Q_ContVidrio`** | † | **Pulso → contador FÍSICO vidrio** |
+
+\* La 1214C base suele tener solo hasta `%Q1.1` (10 DQ). Para los 3 contadores:
+- agregá módulo **SM 1222** (DQ) o el DO que les den, **o**
+- reasigná 3 salidas libres si el MLFB trae más DQ.
+
+† Común del módulo de salidas (mismo +24 V).
+
+**Contadores:** los que den en mesa (electromecánicos / digitales de pulso).  
+Cada clasificación exitosa → **1 pulso corto** (~100 ms) en `Q_Cont*`.  
+Eso es lo que cuenta en la demo; el Int `DatosEstacion.Cont*` es solo espejo web (opcional).
 
 ---
 
@@ -75,9 +88,10 @@ Ver `NETWORKS_LAD.md`.
 
 `M_SistemaOn` · `M_ModoAuto` · `M_Alarma` · `M_EsperandoVision`  
 `M_ClasifPlastico` · `M_ClasifAluminio` · `M_ClasifVidrio` · `M_Clasificando` · `M_PassThrough`  
-`M_Piston1/2/3` → `Q_…Ext` / `Q_…Ret`
+`M_Piston1/2/3` → `Q_…Ext` / `Q_…Ret`  
+`M_PulsoCont1/2/3` (opcional, si el pulso lo armás con TON)
 
-Timers: `T_EmpujePiston1/2/3` · `T_TimeoutVision` · `T_TimeoutVia`
+Timers: `T_EmpujePiston1/2/3` · `T_PulsoCont1/2/3` (~100 ms) · `T_TimeoutVision` · `T_TimeoutVia`
 
 ---
 
