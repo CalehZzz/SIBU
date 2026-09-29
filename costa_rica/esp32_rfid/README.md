@@ -93,10 +93,14 @@ match /rfid_gate/{uid} {
 match /rfid_link_pending/{uid} {
   allow read, write: if request.auth != null && request.auth.uid == uid;
 }
+match /rfid_scan/{doc} {
+  allow read: if request.auth != null;
+  allow write: if false; // Pi Admin SDK
+}
 match /rfid_tarjetas/{cardUid} {
   allow read: if request.auth != null && resource.data.authUid == request.auth.uid;
-  allow write: if request.auth.token.admin == true; // Pi: Admin SDK
+  allow write: if request.auth.token.admin == true;
 }
 ```
 
-Desplegar rules: `firebase deploy --only firestore:rules`
+Desplegar: `firebase deploy --only firestore:rules,hosting`
