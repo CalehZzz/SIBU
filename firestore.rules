@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    // Perfil propio
+    match /usuarios/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow delete: if isAdmin();
+    }
+
+    // Catálogo estación
+    match /estaciones/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /precios/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Sesión en vivo + HMI (cliente + bridge Admin SDK)
+    match /sesiones_activas/{id} {
+      allow read, write: if signedIn();
+    }
+
+    match /hmi_comandos/{id} {
+      allow read, write: if signedIn();
+    }
+
+    // Historial: cada user ve/crea lo suyo
+    match /registros/{id} {
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Cámara Pi: el cliente manda comandos; el estado lo escribe la Pi (Admin)
+    match /vision_pi/comando {
+      allow read, write: if signedIn();
+    }
+    match /vision_pi/estado {
+      allow read: if signedIn();
+      allow write: if false; // solo Admin SDK (Pi)
+    }
+
+    // RFID: la Pi desbloquea (Admin). El cliente solo puede leer o bloquear.
+    match /rfid_gate/{doc} {
+      allow read: if signedIn();
+      allow create: if false;
+      allow update: if signedIn()
+        && request.resource.data.unlocked == false
+        && request.resource.data.untilMs == 0;
+      allow delete: if false;
+    }
+
+    // Allowlist de tarjetas (UID hex = id del doc)
+    match /rfid_tarjetas/{uid} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
