@@ -41,7 +41,7 @@ DB_READ_FALLBACKS = (28, 24, 22, 20, 18)
 DB_HMI_WRITE_FALLBACKS = (6, 2)
 
 ESTADO_TXT = {0: "idle", 1: "running", 2: "clasificando", 3: "alarma", 4: "emergencia"}
-MATERIAL_TXT = {0: None, 1: "plastico", 2: "aluminio", 3: "vidrio"}
+MATERIAL_TXT = {0: None, 1: "plastico", 2: "aluminio", 3: "vidrio", 4: "desconocido"}
 
 # Avisos repetidos (Invalid address / DB chico) → una vez + recordatorio cada N s
 _warn_state: dict[str, float] = {}
@@ -95,7 +95,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--slot", type=int, default=1)
     p.add_argument("--db", type=int, default=1, help="DB DatosEstacion")
     p.add_argument("--db-hmi", type=int, default=3, help="DB_HMI comandos")
-    p.add_argument("--interval", type=float, default=0.25)
+    p.add_argument(
+        "--interval",
+        type=float,
+        default=1.0,
+        help="Segundos entre ciclos (lectura HMI + escritura sesión). Default 1.0 para no quemar Firestore",
+    )
     p.add_argument("--reset-on-start", action="store_true")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--no-hmi-write", action="store_true", help="Solo lee PLC, no escribe DB_HMI")
@@ -368,6 +373,7 @@ def main() -> None:
         print("dry-run: sin Firebase")
 
     print("Loop… Ctrl+C sale.\n")
+    last_fs_payload: dict | None = None
     try:
         while True:
             # 1) HMI web → PLC
@@ -409,7 +415,8 @@ def main() -> None:
                     f"⚠️  lectura DatosEstacion: {e}\n"
                     "   Tip: py plc_probe.py --ip <misma_IP>  |  plc_real/FIX_DB_INVALID_ADDRESS.md",
                 )
-                time.sleep(1.0)
+                # PLC caído: no martillar Firestore (cada ciclo hace cmd_ref.get)
+                time.sleep(max(5.0, args.interval * 5))
                 continue
 
             m = payload["materiales"]
@@ -422,15 +429,18 @@ def main() -> None:
             )
 
             if not args.dry_run and sesion_ref is not None:
-                sesion_ref.set(
-                    {
-                        "materiales": payload["materiales"],
-                        "finalizada": payload["finalizada"],
-                        "plc": payload["plc"],
-                        "actualizado": firestore.SERVER_TIMESTAMP,
-                    },
-                    merge=True,
-                )
+                fs_body = {
+                    "materiales": payload["materiales"],
+                    "finalizada": payload["finalizada"],
+                    "plc": payload["plc"],
+                }
+                # Solo escribir si cambió (evita writes inútiles a Firestore)
+                if fs_body != last_fs_payload:
+                    sesion_ref.set(
+                        {**fs_body, "actualizado": firestore.SERVER_TIMESTAMP},
+                        merge=True,
+                    )
+                    last_fs_payload = fs_body
 
             if payload["finalizada"]:
                 print("\n✅ FinSesion en PLC.")

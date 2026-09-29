@@ -48,10 +48,10 @@ DatosEstacion.PistonOn  := M_Piston1 OR M_Piston2 OR M_Piston3;
 | **1.6** | **SensorVidrio** | Espejo / sim vía P3 (posición) |
 | 1.7 | *(libre)* | reservado |
 | 2.0 | PesoActualKg | Real |
-| **6.0** | **`VisionMaterial`** | **Int** · 0 ninguno · **1** plástico · **2** aluminio · **3** vidrio |
+| **6.0** | **`VisionMaterial`** | **Int** · **0** vacío/pendiente · **1** plástico · **2** aluminio · **3** vidrio · **4** desconocido (pass-through) |
 
-> **Visión (Pi 4 + Gemini):** escribe solo `VisionMaterial` @ 6.0.  
+> **Visión (Pi 4 + Gemini):** escribe `VisionMaterial` @ 6.0 (`4` si no reconoce).  
 > **Bridge HMI:** escribe bytes 0–5 (no pisa el Int @ 6).  
-> **PLC:** pone `VisionMaterial := 0` al terminar el empuje o por timeout.  
+> **PLC:** pone `VisionMaterial := 0` al terminar empuje, al dejar pasar desconocido, o por timeout.  
 > Optimized **OFF**. Tamaño mínimo **8 bytes**.  
 > **Eliminados:** `PistonNExtendido` / `PistonNRetractado` (no hay FC).

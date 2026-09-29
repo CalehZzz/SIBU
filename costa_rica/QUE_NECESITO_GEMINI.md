@@ -8,8 +8,8 @@ Pasame esto y dejo el servicio de visión cerrado (sin placeholders).
    - De [Google AI Studio](https://aistudio.google.com/apikey)  
    - La metemos solo en la Pi 4 (`export` / `.env`), nunca en `index.html` ni en Git.
 
-2. **Modelo preferido** (si no decís, uso `gemini-2.0-flash` o el flash estable del momento)  
-   - Ej.: `gemini-2.0-flash` / `gemini-1.5-flash`
+2. **Modelo preferido** (default actual: `gemini-3.8-flash`)  
+   - Ej.: `gemini-3.8-flash`
 
 3. **Cómo conectás la cámara a la Pi 4**  
    - CSI (módulo oficial) **o** USB  

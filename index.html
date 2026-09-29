@@ -184,6 +184,34 @@
   .plc-grid{
     display:grid; grid-template-columns:1fr 1fr; gap:8px;
   }
+  /* ---------- Prueba visión Gemini (sin PLC) ---------- */
+  .vision-card{margin-top:12px;}
+  .vision-video-wrap{
+    position:relative; width:100%; aspect-ratio:4/3; background:#1a1f26;
+    border-radius:16px; overflow:hidden; margin:10px 0;
+  }
+  .vision-video-wrap video, .vision-video-wrap canvas, .vision-video-wrap img{
+    width:100%; height:100%; object-fit:cover; display:block;
+  }
+  .vision-video-wrap .vision-placeholder{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:#9AA6C4; font-size:13px; font-weight:700; text-align:center; padding:16px;
+  }
+  .vision-result{
+    margin-top:12px; padding:14px; border-radius:16px; background:var(--cream);
+    border:2px solid var(--cream-2);
+  }
+  .vision-result .vr-label{
+    font-family:'Fredoka',sans-serif; font-size:22px; color:var(--forest); margin:4px 0;
+  }
+  .vision-result .vr-meta{font-size:12.5px; color:var(--forest-soft); line-height:1.45;}
+  .vision-result.ok{border-color:rgba(95,174,126,.45); background:#E6F5EA;}
+  .vision-result.bad{border-color:rgba(255,139,103,.45); background:#FFF0EB;}
+  .vision-result.wait{opacity:.85;}
+  .vision-key-row{display:flex; gap:8px; align-items:stretch;}
+  .vision-key-row input{flex:1;}
+  .vision-hint{font-size:12.5px; color:var(--forest-soft); line-height:1.45; margin:8px 0 0;}
+
   .plc-chip{
     background:var(--cream); border-radius:12px; padding:8px 10px;
     font-size:12px; color:var(--forest-soft); font-weight:700;
@@ -1254,6 +1282,7 @@
       <div class="brand"><span class="logo">♻️</span><span>SIBU</span></div>
       <div class="navpills">
         <button class="pill" data-view="stations">🏠</button>
+        <button class="pill" data-view="vision">📷</button>
         <button class="pill" data-view="plc-real">🔌</button>
         <button class="pill" data-view="history">📜</button>
         <button class="pill hidden" id="nav-admin" data-view="admin">⚙️</button>
@@ -1659,6 +1688,60 @@
         </p>
       </section>
 
+      <!-- ---------- PRUEBA VISIÓN GEMINI (cámara de la Pi, sin PLC) ---------- -->
+      <section id="view-vision" class="hidden">
+        <div class="greeting">
+          <h2>Cámara Raspberry · Gemini</h2>
+          <p>Usa la cámara conectada a la Pi. La API key ya vive en la Pi — no hace falta PLC.</p>
+        </div>
+
+        <div class="card vision-card">
+          <div class="section-title">Conexión a la Pi</div>
+          <div class="field">
+            <label>URL del servicio en la Raspberry</label>
+            <input type="text" id="vision-pi-url" placeholder="http://172.20.10.2:8080" autocomplete="off">
+          </div>
+          <div class="btn-row" style="margin-top:10px;">
+            <button class="btn btn-outline" id="btn-vision-save-url" type="button">Guardar URL</button>
+            <button class="btn btn-outline" id="btn-vision-ping" type="button">Probar conexión</button>
+          </div>
+          <p class="vision-hint" id="vision-pi-status">Sin probar aún</p>
+          <p class="vision-hint">
+            En la Pi: <span class="mono">python costa_rica/vision_http.py --port 8080</span>
+            · Abrí esta web desde <span class="mono">http://IP_PI:8080/</span> (misma red).
+          </p>
+        </div>
+
+        <div class="card vision-card">
+          <div class="section-title">Vista cámara (Pi)</div>
+          <div class="vision-video-wrap" id="vision-video-wrap">
+            <img id="vision-shot" class="hidden" alt="Snapshot Pi">
+            <div class="vision-placeholder" id="vision-placeholder">Tocá «Actualizar vista» para ver la cámara de la Pi</div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-outline" id="btn-vision-refresh" type="button">Actualizar vista</button>
+            <button class="btn btn-outline" id="btn-vision-live" type="button">Vista cada 2s</button>
+          </div>
+          <div class="btn-row" style="margin-top:12px;">
+            <button class="btn btn-primary" id="btn-vision-identify" type="button">🔍 Identificar con Gemini (Pi)</button>
+          </div>
+        </div>
+
+        <div class="card vision-card">
+          <div class="section-title">Resultado</div>
+          <div class="vision-result wait" id="vision-result">
+            <div class="vr-meta">Sin prueba aún</div>
+            <div class="vr-label" id="vision-result-label">—</div>
+            <div class="vr-meta mono" id="vision-result-code">VisionMaterial = —</div>
+            <div class="vr-meta" id="vision-result-raw" style="margin-top:8px;"></div>
+          </div>
+          <p class="vision-hint">
+            Códigos: <b>1</b> plástico · <b>2</b> aluminio · <b>3</b> vidrio · <b>0</b> desconocido.
+            Acá solo se muestra; el PLC no recibe nada hasta que corráis el bridge + <span class="mono">vision_gemini.py</span>.
+          </p>
+        </div>
+      </section>
+
       <!-- ---------- ADMIN ---------- -->
       <section id="view-admin" class="hidden">
         <div class="greeting"><h2>Panel admin ⚙️</h2><p>Gestiona precios y estaciones.</p></div>
@@ -1807,7 +1890,7 @@ function showOnly(id){
 }
 
 function showAppView(viewName){
-  ["stations","live","summary","history","admin","hmi","plc-real"].forEach(v => {
+  ["stations","live","summary","history","admin","hmi","plc-real","vision"].forEach(v => {
     $("view-" + v)?.classList.toggle("hidden", v !== viewName);
   });
   document.querySelectorAll(".navpills .pill[data-view]").forEach(p => {
@@ -1818,6 +1901,8 @@ function showAppView(viewName){
   if(viewName !== "hmi") exitHmiFullscreen();
   if(viewName === "hmi") ensureHmiListen();
   if(viewName === "plc-real") updateRealBridgeCmd();
+  if(viewName === "vision") initVisionPanel();
+  if(viewName !== "vision") stopVisionLive();
 }
 
 function hmiPanelEl(){
@@ -2069,6 +2154,144 @@ document.querySelectorAll(".navpills .pill[data-view]").forEach(btn => {
     showAppView(v);
   };
 });
+
+/* -------------------------------------------------------------------------
+   PRUEBA VISIÓN — cámara de la Raspberry Pi + Gemini (sin PLC)
+   ------------------------------------------------------------------------- */
+const VISION_PI_URL_KEY = "sibu_vision_pi_url";
+
+let visionPanelReady = false;
+let visionLiveTimer = null;
+
+function visionPiBase(){
+  let u = ($("vision-pi-url")?.value || localStorage.getItem(VISION_PI_URL_KEY) || "").trim();
+  u = u.replace(/\/$/, "");
+  return u;
+}
+
+function initVisionPanel(){
+  if(!visionPanelReady){
+    visionPanelReady = true;
+    const urlInput = $("vision-pi-url");
+    if(urlInput){
+      const saved = localStorage.getItem(VISION_PI_URL_KEY);
+      urlInput.value = saved || (location.protocol.startsWith("http") ? location.origin : "http://172.20.10.2:8080");
+    }
+    $("btn-vision-save-url").onclick = () => {
+      const u = visionPiBase();
+      if(!u){ toast("Poné la URL de la Pi"); return; }
+      localStorage.setItem(VISION_PI_URL_KEY, u);
+      if($("vision-pi-url")) $("vision-pi-url").value = u;
+      toast("URL guardada");
+    };
+    $("btn-vision-ping").onclick = () => pingVisionPi();
+    $("btn-vision-refresh").onclick = () => refreshVisionSnapshot();
+    $("btn-vision-live").onclick = () => toggleVisionLive();
+    $("btn-vision-identify").onclick = () => identifyVisionPi();
+  }
+  // Si abrimos la web desde la propia Pi, autofill origin
+  if(!$("vision-pi-url").value && location.origin.startsWith("http")){
+    $("vision-pi-url").value = location.origin;
+  }
+}
+
+async function pingVisionPi(){
+  const base = visionPiBase();
+  const st = $("vision-pi-status");
+  if(!base){ toast("Falta URL de la Pi"); return; }
+  st.textContent = "Probando " + base + " …";
+  try{
+    const res = await fetch(base + "/api/health", { cache: "no-store" });
+    const json = await res.json();
+    if(!res.ok || !json.ok) throw new Error(json.error || ("HTTP " + res.status));
+    st.textContent = "OK · modelo " + (json.model || "?") + " · key en Pi: " + (json.has_key ? "sí" : "NO");
+    toast("Pi conectada", { soft: true });
+  }catch(e){
+    console.error(e);
+    st.textContent = "No conecta: " + (e.message || e) + " — ¿visión_http.py corriendo? ¿misma red?";
+    toast("No se pudo hablar con la Pi");
+  }
+}
+
+function stopVisionLive(){
+  if(visionLiveTimer){
+    clearInterval(visionLiveTimer);
+    visionLiveTimer = null;
+  }
+  const btn = $("btn-vision-live");
+  if(btn) btn.textContent = "Vista cada 2s";
+}
+
+function toggleVisionLive(){
+  if(visionLiveTimer){
+    stopVisionLive();
+    toast("Vista en vivo off", { soft: true });
+    return;
+  }
+  refreshVisionSnapshot();
+  visionLiveTimer = setInterval(() => refreshVisionSnapshot({ silent: true }), 2000);
+  $("btn-vision-live").textContent = "Parar vista";
+}
+
+async function refreshVisionSnapshot(opts){
+  const base = visionPiBase();
+  if(!base){ if(!(opts && opts.silent)) toast("Falta URL de la Pi"); return; }
+  try{
+    const res = await fetch(base + "/api/snapshot?ts=" + Date.now(), { cache: "no-store" });
+    if(!res.ok){
+      let err = "HTTP " + res.status;
+      try{ const j = await res.json(); err = j.error || err; }catch(_){}
+      throw new Error(err);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const img = $("vision-shot");
+    const ph = $("vision-placeholder");
+    if(img){
+      if(img.dataset.blobUrl) URL.revokeObjectURL(img.dataset.blobUrl);
+      img.dataset.blobUrl = url;
+      img.src = url;
+      img.classList.remove("hidden");
+    }
+    ph?.classList.add("hidden");
+  }catch(e){
+    console.error(e);
+    if(!(opts && opts.silent)) toast("Snapshot falló: " + (e.message || e));
+  }
+}
+
+function setVisionResult(state, label, code, raw){
+  const box = $("vision-result");
+  box.classList.remove("ok", "bad", "wait");
+  box.classList.add(state);
+  $("vision-result-label").textContent = label;
+  $("vision-result-code").textContent = "VisionMaterial = " + code;
+  $("vision-result-raw").textContent = raw || "";
+}
+
+async function identifyVisionPi(){
+  const base = visionPiBase();
+  if(!base){ toast("Falta URL de la Pi"); return; }
+  setVisionResult("wait", "Consultando Pi / Gemini…", "…", base + "/api/classify");
+  $("btn-vision-identify").disabled = true;
+  try{
+    const res = await fetch(base + "/api/classify", { method: "POST" });
+    const json = await res.json();
+    if(!res.ok || !json.ok) throw new Error(json.error || ("HTTP " + res.status));
+    const code = Number(json.code || json.visionMaterial || 0);
+    const label = (json.label || "").toLowerCase();
+    const nice = code === 1 ? "plástico" : code === 2 ? "aluminio / lata" : code === 3 ? "vidrio" : code === 4 ? "desconocido (pass-through)" : (label || "desconocido");
+    setVisionResult((code >= 1 && code <= 3) ? "ok" : (code === 4 ? "wait" : "bad"), nice, String(code), "Gemini (Pi) dijo: " + (json.raw || label));
+    await refreshVisionSnapshot({ silent: true });
+    toast(code === 4 ? "Desconocido — pasaría de largo" : (code ? ("Detectado: " + nice) : "No reconocido"));
+  }catch(e){
+    console.error(e);
+    setVisionResult("bad", "Error", "0", String(e.message || e));
+    toast("Falló classify en la Pi");
+  }finally{
+    $("btn-vision-identify").disabled = false;
+  }
+}
 
 /* -------------------------------------------------------------------------
    HMI VIRTUAL — comandos a Firestore → plc_bridge → DB_HMI en PLC 1511C

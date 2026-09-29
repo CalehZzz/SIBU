@@ -1,0 +1,17 @@
+[Unit]
+Description=SIBU PLC bridge (Firestore <-> snap7)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sibucr
+WorkingDirectory=/home/sibucr/SIBU
+EnvironmentFile=-/home/sibucr/SIBU/costa_rica/sibu.env
+# --interval 1.0 = menos lecturas Firestore; solo escribe si cambian datos
+ExecStart=/home/sibucr/SIBU/.venv/bin/python plc_real/plc_bridge_real.py --ip ${PLC_IP} --interval 1.0
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

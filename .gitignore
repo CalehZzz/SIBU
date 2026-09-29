@@ -1,6 +1,7 @@
 # Claves privadas — NUNCA subir a git
 serviceAccountKey.json
 **/serviceAccountKey*.json
+costa_rica/sibu.env
 __pycache__/
 *.pyc
 .venv/
