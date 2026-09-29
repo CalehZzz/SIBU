@@ -1310,6 +1310,24 @@
   .bin-card.lleno .bin-bar > span{background:#E6B422;}
   .bin-card.lleno.rechazo .bin-bar > span{background:#D64545;}
   .bin-pct{font-family:'JetBrains Mono',monospace; font-weight:800; font-size:18px; color:var(--forest);}
+  .bin-card.off{
+    opacity:.55; filter:grayscale(.35);
+  }
+  .bin-card.off .bin-bar > span{width:0 !important; background:#B8B0A0;}
+  .bin-card .bin-badge{
+    display:inline-block; font-size:10px; font-weight:800; letter-spacing:.04em;
+    text-transform:uppercase; padding:2px 7px; border-radius:999px; margin-left:6px;
+    vertical-align:middle;
+  }
+  .bin-badge.on{background:#E6F5EA; color:var(--leaf-dark);}
+  .bin-badge.off{background:#EDE8DC; color:#8A7A5C;}
+  .bins-peso-box{
+    margin-top:10px; background:var(--cream); border-radius:14px; padding:12px 14px;
+    display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+  }
+  .bins-peso-box .lab{font-size:12px; font-weight:800; color:var(--forest-soft); text-transform:uppercase; letter-spacing:.04em;}
+  .bins-peso-box .val{font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:800; color:var(--forest);}
+
 
   .real-cmd{
     margin:0; padding:12px 14px; background:var(--cream); border-radius:12px;
@@ -1782,40 +1800,42 @@
         <div class="card real-card" id="bins-panel">
           <div class="section-title">Botes + báscula · ESP32 (demo)</div>
           <p style="font-size:13px; color:var(--forest-soft); line-height:1.45; margin:0 0 10px;">
-            Demo: HC <b>plástico</b> + <b>rechazo</b>, LCD y báscula <b>HX711</b> (plástico).
-            Plástico lleno → <b>amarilla</b> (desvío a rechazo). Rechazo lleno → <b>roja</b> + stop.
-            RFID va por <b>Arduino USB</b> a la Pi.
+            En esta demo solo está conectado el bote de <b>plástico</b> (HC-SR04 + LCD + báscula HX711).
+            Aluminio, vidrio y rechazo aparecen como <b>desconectados</b> hasta cablearlos.
           </p>
           <div class="bins-lamp green" id="bins-lamp"><span class="dot"></span><span id="bins-lamp-text">Esperando ESP32…</span></div>
-          <div class="plc-chip" style="margin-top:10px;">Peso plástico (HX711) <b id="bins-peso">— kg</b></div>
+          <div class="bins-peso-box">
+            <span class="lab">Peso plástico · HX711</span>
+            <span class="val" id="bins-peso">— kg</span>
+          </div>
           <div class="bins-grid" id="bins-grid">
             <div class="bin-card" id="bin-plastico">
-              <div class="bin-name">🥤 Plástico <span style="font-weight:600;color:var(--forest-soft);">(LCD + HC)</span></div>
+              <div class="bin-name">🥤 Plástico <span class="bin-badge on">En línea</span></div>
               <div class="bin-pct" id="bin-plastico-pct">—%</div>
               <div class="bin-bar"><span id="bin-plastico-bar"></span></div>
               <div class="bin-meta" id="bin-plastico-meta">Sin datos</div>
             </div>
-            <div class="bin-card" id="bin-rechazo">
-              <div class="bin-name">🚫 Rechazo</div>
-              <div class="bin-pct" id="bin-rechazo-pct">—%</div>
+            <div class="bin-card off" id="bin-rechazo">
+              <div class="bin-name">🚫 Rechazo <span class="bin-badge off">Desconectado</span></div>
+              <div class="bin-pct" id="bin-rechazo-pct">—</div>
               <div class="bin-bar"><span id="bin-rechazo-bar"></span></div>
-              <div class="bin-meta" id="bin-rechazo-meta">Sin datos</div>
+              <div class="bin-meta" id="bin-rechazo-meta">Sensor no cableado</div>
             </div>
-            <div class="bin-card" id="bin-aluminio" style="opacity:.45;">
-              <div class="bin-name">🥫 Aluminio</div>
+            <div class="bin-card off" id="bin-aluminio">
+              <div class="bin-name">🥫 Aluminio <span class="bin-badge off">Desconectado</span></div>
               <div class="bin-pct" id="bin-aluminio-pct">—</div>
               <div class="bin-bar"><span id="bin-aluminio-bar"></span></div>
-              <div class="bin-meta" id="bin-aluminio-meta">Próximamente</div>
+              <div class="bin-meta" id="bin-aluminio-meta">Sensor no cableado</div>
             </div>
-            <div class="bin-card" id="bin-vidrio" style="opacity:.45;">
-              <div class="bin-name">🍾 Vidrio</div>
+            <div class="bin-card off" id="bin-vidrio">
+              <div class="bin-name">🍾 Vidrio <span class="bin-badge off">Desconectado</span></div>
               <div class="bin-pct" id="bin-vidrio-pct">—</div>
               <div class="bin-bar"><span id="bin-vidrio-bar"></span></div>
-              <div class="bin-meta" id="bin-vidrio-meta">Próximamente</div>
+              <div class="bin-meta" id="bin-vidrio-meta">Sensor no cableado</div>
             </div>
           </div>
           <p class="vision-hint" style="margin-top:12px;" id="bins-status">
-            ESP32 → <span class="mono">sibu-bins</span> · Arduino RFID → <span class="mono">sibu-rfid-gate</span> (USB)
+            Conexiones: <span class="mono">costa_rica/arduino_bins/README.md</span> · RFID Arduino: <span class="mono">arduino_rfid/</span>
           </p>
         </div>
 
@@ -3235,16 +3255,26 @@ function renderRealPanel(data){
 const BINS_ESTADO = () => doc(db, "bins_pi", "estado");
 let binsUnsub = null;
 
-function paintBin(key, data, isRechazo){
-  const d = data || {};
-  const pct = Math.max(0, Math.min(100, Number(d.pct) || 0));
-  const lleno = !!d.lleno;
+function paintBin(key, data, opts){
+  const o = opts || {};
   const card = $("bin-" + key);
   const pctEl = $("bin-" + key + "-pct");
   const bar = $("bin-" + key + "-bar");
   const meta = $("bin-" + key + "-meta");
+  if(o.offline){
+    card?.classList.add("off");
+    card?.classList.remove("lleno","rechazo");
+    if(pctEl) pctEl.textContent = "—";
+    if(bar) bar.style.width = "0%";
+    if(meta) meta.textContent = "Desconectado";
+    return;
+  }
+  const d = data || {};
+  const pct = Math.max(0, Math.min(100, Number(d.pct) || 0));
+  const lleno = !!d.lleno;
+  card?.classList.remove("off");
   card?.classList.toggle("lleno", lleno);
-  card?.classList.toggle("rechazo", !!(lleno && isRechazo));
+  card?.classList.toggle("rechazo", !!(lleno && o.isRechazo));
   if(pctEl) pctEl.textContent = pct + "%";
   if(bar) bar.style.width = pct + "%";
   if(meta){
@@ -3259,29 +3289,31 @@ function renderBinsPanel(raw){
   const lamp = $("bins-lamp");
   const lampTxt = $("bins-lamp-text");
   const st = $("bins-status");
+  // Solo plástico en línea en esta demo
+  paintBin("aluminio", null, { offline: true });
+  paintBin("vidrio", null, { offline: true });
+  paintBin("rechazo", null, { offline: true });
+
   if(!raw){
     lamp?.classList.remove("green","yellow","red");
     lamp?.classList.add("green");
-    if(lampTxt) lampTxt.textContent = "Sin datos — ¿corre sibu-bins?";
+    if(lampTxt) lampTxt.textContent = "Sin datos — ¿ESP32 + sibu-bins?";
+    paintBin("plastico", null, { offline: false });
+    if($("bin-plastico-meta")) $("bin-plastico-meta").textContent = "Esperando telemetría…";
+    if($("bins-peso")) $("bins-peso").textContent = "— kg";
     if(st) st.textContent = "Firestore bins_pi/estado vacío";
     return;
   }
-  const color = String(raw.lamp || "green");
+  const p = raw.plastico || {};
+  const llenoP = !!p.lleno;
   lamp?.classList.remove("green","yellow","red");
-  lamp?.classList.add(color === "red" ? "red" : color === "yellow" ? "yellow" : "green");
-  const divert = raw.divert || {};
-  let msg = "OK · todos los botes con espacio";
-  if(raw.stop || color === "red"){
-    msg = "STOP · bote de rechazo LLENO";
-  } else if(color === "yellow"){
-    const diverted = ["plastico","aluminio","vidrio"].filter(k => divert[k]).map(k => k);
-    msg = "Desvío a rechazo: " + (diverted.length ? diverted.join(", ") : "material(es) lleno(s)");
+  lamp?.classList.add(llenoP ? "yellow" : "green");
+  if(lampTxt){
+    lampTxt.textContent = llenoP
+      ? "Plástico LLENO · (rechazo/otros desconectados en demo)"
+      : "Plástico en línea · resto desconectado";
   }
-  if(lampTxt) lampTxt.textContent = msg;
-  paintBin("plastico", raw.plastico, false);
-  paintBin("aluminio", raw.aluminio, false);
-  paintBin("vidrio", raw.vidrio, false);
-  paintBin("rechazo", raw.rechazo, true);
+  paintBin("plastico", p, { offline: false });
   const pesoEl = $("bins-peso");
   if(pesoEl){
     const kg = raw.pesoKg;
@@ -3291,7 +3323,7 @@ function renderBinsPanel(raw){
   }
   if(st){
     st.textContent = raw.online
-      ? ("ESP32 en vivo · " + (raw.atMs ? new Date(raw.atMs).toLocaleTimeString() : ""))
+      ? ("Plástico en vivo · " + (raw.atMs ? new Date(raw.atMs).toLocaleTimeString() : ""))
       : "Último frame recibido";
   }
 }
