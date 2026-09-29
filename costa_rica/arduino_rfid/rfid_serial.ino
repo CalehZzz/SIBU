@@ -1,13 +1,11 @@
 /*
- * SIBU — Arduino + RC522 → Serial USB → Raspberry Pi (RFID)
+ * SIBU — Arduino + RC522 → Serial USB → Raspberry Pi
  *
- * Librería: MFRC522 by Miguel Balboa
- *
- * Cableado Uno / Nano:
+ * Cableado Uno/Nano:
  *   SDA/SS→D10  SCK→D13  MOSI→D11  MISO→D12  RST→D9
- *   VCC→3.3V (mejor regulador 3.3V externo)  GND→GND
+ *   VCC→3.3V   GND→GND
  *
- * Serial 115200. Si ves beat pero no uid → alimentación/antena del RC522.
+ * Serial Monitor: 115200
  */
 
 #include <SPI.h>
@@ -20,8 +18,6 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 String lastUid = "";
 unsigned long lastTapMs = 0;
 unsigned long lastBeatMs = 0;
-bool readerOk = false;
-int failReads = 0;
 
 String uidToHex(MFRC522::Uid uid) {
   String s = "";
@@ -33,98 +29,61 @@ String uidToHex(MFRC522::Uid uid) {
   return s;
 }
 
-bool checkReader() {
-  byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
-  Serial.print(F("{\"diag\":\"rc522\",\"version\":\"0x"));
-  if (v < 0x10) Serial.print('0');
-  Serial.print(v, HEX);
-  Serial.print(F("\""));
-  if (v == 0x00 || v == 0xFF) {
-    Serial.println(F(",\"ok\":false,\"error\":\"SPI muerto — 3.3V/GND/cables\"}"));
-    return false;
-  }
-  Serial.println(F(",\"ok\":true}"));
-  return true;
-}
-
 void setup() {
   Serial.begin(115200);
-  while (!Serial && millis() < 3000) {}
-
-  pinMode(RST_PIN, OUTPUT);
-  digitalWrite(RST_PIN, LOW);
-  delay(20);
-  digitalWrite(RST_PIN, HIGH);
-  delay(50);
+  while (!Serial && millis() < 2500) {}
 
   SPI.begin();
-  // Clones: SPI más lento suele estabilizar
-  SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
   mfrc522.PCD_Init();
-  delay(20);
+  delay(100);
   mfrc522.PCD_Init();
   mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max);
-  mfrc522.PCD_AntennaOn();
-  SPI.endTransaction();
 
-  readerOk = checkReader();
-  if (readerOk) {
-    Serial.println(F("{\"ok\":true,\"msg\":\"RC522 OK — acercá tarjeta 1cm al chip/antena\"}"));
+  byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
+  Serial.print(F("version=0x"));
+  Serial.println(v, HEX);
+
+  if (v == 0x00 || v == 0xFF) {
+    Serial.println(F("FAIL SPI — revisa 3.3V GND D10/D11/D12/D13/D9"));
+  } else {
+    Serial.println(F("RC522 OK — acercá la tarjeta"));
   }
 }
 
 void loop() {
-  if (!readerOk) {
-    if (millis() - lastBeatMs > 2500) {
-      lastBeatMs = millis();
-      mfrc522.PCD_Init();
-      readerOk = checkReader();
-    }
+  // Heartbeat legible en el IDE
+  if (millis() - lastBeatMs > 2000) {
+    lastBeatMs = millis();
+    byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
+    Serial.print(F("esperando... version=0x"));
+    Serial.println(v, HEX);
+  }
+
+  if (!mfrc522.PICC_IsNewCardPresent()) {
+    delay(50);
+    return;
+  }
+  if (!mfrc522.PICC_ReadCardSerial()) {
     delay(50);
     return;
   }
 
-  // Lectura agresiva: varios intentos por ciclo
-  bool got = false;
-  for (int attempt = 0; attempt < 3 && !got; attempt++) {
-    if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
-      got = true;
-      break;
-    }
-    // Segunda chance: a veces el "new" se come el primer poll
-    if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
-      got = true;
-      break;
-    }
-    delay(5);
-  }
-
-  if (got) {
-    String uid = uidToHex(mfrc522.uid);
-    unsigned long now = millis();
-    if (!(uid == lastUid && (now - lastTapMs) < 1200)) {
-      lastUid = uid;
-      lastTapMs = now;
-      Serial.print(F("{\"uid\":\""));
-      Serial.print(uid);
-      Serial.println(F("\"}"));
-      Serial.flush();
-    }
+  String uid = uidToHex(mfrc522.uid);
+  if (uid == lastUid && (millis() - lastTapMs) < 1500) {
     mfrc522.PICC_HaltA();
-    mfrc522.PCD_StopCrypto1();
-    delay(200);
     return;
   }
+  lastUid = uid;
+  lastTapMs = millis();
 
-  if (millis() - lastBeatMs > 2000) {
-    lastBeatMs = millis();
-    byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
-    Serial.print(F("{\"beat\":true,\"version\":\"0x"));
-    if (v < 0x10) Serial.print('0');
-    Serial.print(v, HEX);
-    Serial.println(F("\",\"msg\":\"esperando tarjeta — pegala al centro del RC522\"}"));
-    Serial.flush();
-    if (v == 0x00 || v == 0xFF) readerOk = false;
-  }
-  delay(20);
+  // Línea simple para el IDE + JSON para la Pi
+  Serial.print(F("UID: "));
+  Serial.println(uid);
+  Serial.print(F("{\"uid\":\""));
+  Serial.print(uid);
+  Serial.println(F("\"}"));
+
+  mfrc522.PICC_HaltA();
+  mfrc522.PCD_StopCrypto1();
+  delay(300);
 }
