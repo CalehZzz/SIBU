@@ -1,6 +1,6 @@
 # I/O — CPU 1214C (pistones + botes HC-SR04 + contadores físicos)
 
-Operador **100 % web**. Mesa: sensores de vía + banda + 3 pistones + **4 botes con HC-SR04 (Arduino)** + contadores físicos + semáforo.
+Operador de mesa: **HMI web** (plus del equipo). Rúbrica: **AS (sim) + TIA + este físico**. Mesa: sensores de vía + banda + 3 pistones + **4 botes con HC-SR04** + contadores físicos + semáforo.
 
 ```
   Entrada → foto Gemini (banda sigue)

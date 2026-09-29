@@ -1,4 +1,8 @@
-# Sin AS — solo Web ↔ TIA (plástico / latas / vidrio · doble efecto · sin FC)
+# Sin AS — solo Web ↔ TIA (atajo de laboratorio)
+
+> **No es el camino de la rúbrica.** Sirve para probar HMI/bridge sin abrir AS.  
+> En defensa: **Automation Studio + TIA + físico** son obligatorios; la web es **plus**.  
+> Ver [`12_RUBRICA_CAPAS.md`](12_RUBRICA_CAPAS.md).
 
 ```
 Estación (app) → Abrir HMI

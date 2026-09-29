@@ -1,6 +1,6 @@
 # Contrato web — 3 pistones (plástico / latas / vidrio) · sin FC
 
-Optimized **OFF** en ambos DB. Operador 100 % web → `DB_HMI`.
+Optimized **OFF** en ambos DB. Operador de mesa vía HMI web (plus) → `DB_HMI`. Rúbrica: AS + TIA + físico.
 
 Actuadores reales: **6 solenoides** (`Q_PistonNExt` / `Q_PistonNRet`) + banda + 3 relés.  
 Espejo: `PistonNOn` = comando `M_PistonN`. **Sin** bits de extendido/retractado en el DB.

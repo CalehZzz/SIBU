@@ -97,8 +97,9 @@ Si la demo integral se atrasa: recorten el tramo 9:00–12:30, **no** el físico
 
 > “Propuesta: una **estación modular SIBU** para colegio, parque o centro comunal.  
 > Flujo: pieza → báscula → banda → sensor de material → separación → app con piezas, kilos y colones.  
-> Tres capas: electroneumática en **Automation Studio**, cerebro en **TIA Portal**, innovación en **HMI/app web** que habla con el PLC.  
-> Carla les muestra el PLC y el circuito. Caleb, la capa que toca el usuario.”
+> Lo que pide la rúbrica: electroneumática en **Automation Studio**, cerebro en **TIA Portal**, y al final **físico** en mesa.  
+> Nuestro **plus**: **HMI/app web** que habla con el mismo PLC — no sustituye AS ni el hardware.  
+> Carla: PLC y circuito. Caleb: el plus que toca el usuario.”
 
 ### 2:15–2:25 · Handoff (~10 s)
 
@@ -156,10 +157,10 @@ Si la demo integral se atrasa: recorten el tramo 9:00–12:30, **no** el físico
 
 **Caleb (abre la web):**
 
-> “La innovación no fue otra KTP en el rack.  
-> Fue preguntar: ¿quién usa esto en un colegio o un parque? Un celular.  
-> Por eso **SIBU web**: app de usuario con kilos y colones; **HMI virtual** tipo Comfort; puente **`plc_bridge.py`** Firestore ↔ snap7 ↔ DBs.  
-> El navegador no habla S7. El bridge sí.”
+> “La rúbrica pide AS, TIA y físico. Nuestro **plus** es la web.  
+> No otra KTP en el rack: en colegio o parque la gente trae **celular**.  
+> **SIBU web**: app con kilos y colones; **HMI virtual**; puente **`plc_bridge.py`** Firestore ↔ snap7 ↔ DBs.  
+> El PLC sigue siendo el master. El navegador no habla S7. El bridge sí.”
 
 ### 6:40–8:10 · HMI (~1:30)
 
@@ -212,12 +213,12 @@ Si algo falla: pasen al siguiente material; no depuren en vivo más de 20 s.
 
 **Caleb (~40–50 s, cámara a la mesa / video corto):**
 
-> “Sí. Estamos montando SIBU en **físico**: banda, sensores y **tres pistones** — plástico, latas, vidrio — con mando desde la misma web.  
-> Sin botonera en mesa: opera el HMI.”
+> “Sí. El **físico** también es rúbrica: banda, sensores y **tres pistones** — plástico, latas, vidrio.  
+> Misma lógica Siemens en I/Q reales. La web es el plus de mando/usuario, no el único sistema.”
 
 **Carla (~10–15 s):**
 
-> “Eso es pasar de `%M`/AS a **I/Q** en **1214C**, mismo contrato de DBs.”
+> “Pasamos de `%M`/AS a **I/Q** en **1214C**, mismo contrato de DBs.”
 
 Si el hardware está a medias, digan exactamente eso — sin overclaim.
 
@@ -228,13 +229,13 @@ Si el hardware está a medias, digan exactamente eso — sin overclaim.
 **Edgar (~25 s):**
 
 > “SIBU responde a un problema real de reciclaje con automatización: clasifica, mide y recompensa.  
-> Siemens en el núcleo. Web como puente al usuario.  
+> Núcleo Siemens: **AS + TIA + físico**. Web como **plus** al usuario.  
 > Estación pensada para colegios y espacios públicos en Costa Rica.”
 
 **Una línea cada uno (~15 s total):**
 
-- **Carla:** “PLC estructurado y listo para campo.”  
-- **Caleb:** “Innovación que se toca con el celular.”  
+- **Carla:** “PLC y AS listos; físico en 1214C.”  
+- **Caleb:** “Plus web: se toca con el celular.”  
 - **Edgar:** “Gracias. Quedamos abiertos a preguntas técnicas.”
 
 ---
@@ -243,11 +244,13 @@ Si el hardware está a medias, digan exactamente eso — sin overclaim.
 
 - “Es como un Arduino pero con Siemens…”  
 - “La página es lo más importante y el PLC es secundario…”  
+- “Todo está en la web; Automation Studio es opcional…”  
 - “KEPServer es un programa que conecta cosas” → digan **tags / OPC / `%M`**  
 - Cualquier “al final tenemos una sorpresa…” **antes** del minuto 12:30  
 
 ## Frases que suman con jurado Siemens
 
+- “Rúbrica: AS + TIA + físico; la web es nuestro plus.”  
 - “Optimized block access OFF por offsets de snap7.”  
 - “Una bobina por salida: AUTO y MANUAL en paralelo.”  
 - “Timeout TON de pistón → alarma.”  

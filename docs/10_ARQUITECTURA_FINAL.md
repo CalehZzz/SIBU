@@ -2,6 +2,13 @@
 
 Versiones y diagrama de lo que estás usando **ahora**.
 
+## Rúbrica (leer primero)
+
+**Núcleo obligatorio:** Automation Studio + TIA Portal + demostración física.  
+**Plus del equipo:** página web Guacamayos (HMI virtual + app usuario + bridge).
+
+La web **no** reemplaza AS. El camino “solo web ↔ PLC” (`11_SIN_AS_SOLO_WEB.md`) es atajo de laboratorio; en defensa se muestra **AS + KEP + TIA** y al final el **físico**. Detalle: [`12_RUBRICA_CAPAS.md`](12_RUBRICA_CAPAS.md).
+
 ## Stack confirmado
 
 | Pieza | Software / hardware | Versión / artículo |

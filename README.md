@@ -4,17 +4,21 @@ App web + puente al PLC Siemens (TIA Portal / PLCSIM) + guías para Automation S
 
 ## Empieza aquí (stack actual)
 
-**Lee primero:** [`docs/10_ARQUITECTURA_FINAL.md`](docs/10_ARQUITECTURA_FINAL.md) · sim HMI: [`docs/11_SIN_AS_SOLO_WEB.md`](docs/11_SIN_AS_SOLO_WEB.md)  
-TIA V20 · CPU **1511C-1 PN** (demo, **3 pistones sim**) · PLCSIM Advanced **V7** · HMI virtual en la web.  
-PLC real: CPU **1214C** → carpeta [`plc_real/`](plc_real/).
+**Rúbrica:** Automation Studio + TIA + físico = **obligatorio**. Web Guacamayos = **plus / innovación**.  
+Mapa: [`docs/12_RUBRICA_CAPAS.md`](docs/12_RUBRICA_CAPAS.md) · arquitectura: [`docs/10_ARQUITECTURA_FINAL.md`](docs/10_ARQUITECTURA_FINAL.md).
 
-1. [`docs/11_SIN_AS_SOLO_WEB.md`](docs/11_SIN_AS_SOLO_WEB.md) — sim solo HMI · 3 pistones  
-2. [`tia/TABLA_TAGS_DESDE_CERO.md`](tia/TABLA_TAGS_DESDE_CERO.md) — **todas las tags (3 pistones)**  
-3. [`tia/MAPA_DB_HMI.md`](tia/MAPA_DB_HMI.md) — DB de comandos + sensores sim  
-4. [`tia/MAPA_IO_Y_DB.md`](tia/MAPA_IO_Y_DB.md) — DatosEstacion (+ Piston1/2/3On)  
-5. [`tia/NETWORKS_WEB_ONLY.md`](tia/NETWORKS_WEB_ONLY.md) — networks LAD sim  
-6. [`docs/GUION_DEFENSA_15MIN.md`](docs/GUION_DEFENSA_15MIN.md) — guion defensa 15 min  
-7. Resto de guías en [`docs/`](docs/)
+TIA V20 · CPU **1511C-1 PN** (demo AS/KEP) · PLCSIM Advanced **V7** · AS 10 · KEP 6.  
+PLC real: CPU **1214C** → carpeta [`plc_real/`](plc_real/).  
+HMI usable + app = web (plus); atajo lab sin AS: [`docs/11_SIN_AS_SOLO_WEB.md`](docs/11_SIN_AS_SOLO_WEB.md).
+
+1. [`docs/12_RUBRICA_CAPAS.md`](docs/12_RUBRICA_CAPAS.md) — **qué es obligatorio vs plus**  
+2. [`docs/13_CONECTAR_TODO.md`](docs/13_CONECTAR_TODO.md) — **cómo conectar AS + TIA + físico + web**  
+3. [`docs/02_GUIA_AUTOMATION_STUDIO.md`](docs/02_GUIA_AUTOMATION_STUDIO.md) — AS (rúbrica)  
+4. [`tia/TABLA_TAGS_DESDE_CERO.md`](tia/TABLA_TAGS_DESDE_CERO.md) — tags (3 pistones)  
+5. [`tia/MAPA_DB_HMI.md`](tia/MAPA_DB_HMI.md) — DB comandos + sensores  
+6. [`tia/MAPA_IO_Y_DB.md`](tia/MAPA_IO_Y_DB.md) — DatosEstacion  
+7. [`docs/GUION_DEFENSA_15MIN.md`](docs/GUION_DEFENSA_15MIN.md) — defensa 15 min  
+8. Resto en [`docs/`](docs/)
 ### Bridge con PLCSIM Advanced (demo)
 
 ```bash
@@ -34,7 +38,7 @@ python plc_real/plc_bridge_real.py --ip 192.168.0.10
 
 Estación Firestore: `colegio-don-bosco-real`.  
 Hardware: **3 pistones doble efecto** — 6 solenoides Ext/Ret · P1 plástico · P2 latas · P3 vidrio.  
-Semáforo vía relés (`1L`/`2L` = 24 V). Operador: **solo web** — ver `plc_real/TABLA_IO_1214C.md`.
+Semáforo vía relés (`1L`/`2L` = 24 V). HMI de mesa: **web** (plus) — ver `plc_real/TABLA_IO_1214C.md`. Rúbrica: AS + TIA + este físico.
 
 ### Visión Gemini (Raspberry Pi 4) — Costa Rica
 
