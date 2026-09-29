@@ -314,37 +314,70 @@ def main() -> None:
         }
 
     if args.serial:
+        import re
         import threading
+
+        def extract_uid_from_line(line: str) -> str:
+            line = (line or "").strip().strip("\x00").strip()
+            if not line:
+                return ""
+            if line.startswith("{"):
+                try:
+                    u = json.loads(line).get("uid")
+                    return norm_uid(str(u)) if u else ""
+                except Exception:
+                    return ""
+            # "UID: A7240B9F" (salida del sketch para el IDE)
+            m = re.match(r"(?i)^UID\s*[:=]\s*([0-9A-Fa-f:.\-\s]+)\s*$", line)
+            if m:
+                return norm_uid(m.group(1))
+            # solo hex
+            u = norm_uid(line)
+            if u and re.fullmatch(r"[0-9A-F]{6,20}", u):
+                return u
+            return ""
 
         def serial_loop() -> None:
             try:
                 import serial  # type: ignore
             except ImportError:
-                print("⚠️  pyserial no instalado — pip install pyserial")
+                print("⚠️  pyserial no instalado — ~/SIBU/.venv/bin/pip install pyserial")
+                sys.stdout.flush()
                 return
             while True:
                 try:
-                    ser = serial.Serial(args.serial, args.baud, timeout=1)
+                    ser = serial.Serial(
+                        args.serial,
+                        args.baud,
+                        timeout=1,
+                        write_timeout=1,
+                    )
+                    # dar tiempo al reset del Arduino al abrir el puerto
+                    time.sleep(2.0)
+                    ser.reset_input_buffer()
                     print(f"✅ RFID Serial abierto {args.serial}")
+                    sys.stdout.flush()
                     while True:
-                        line = ser.readline().decode("utf-8", errors="ignore").strip()
+                        raw = ser.readline()
+                        if not raw:
+                            continue
+                        line = raw.decode("utf-8", errors="ignore").strip()
                         if not line:
                             continue
-                        uid = ""
-                        if line.startswith("{"):
-                            try:
-                                uid = str(json.loads(line).get("uid") or "")
-                            except Exception:
-                                continue
-                        else:
-                            # hex suelto
-                            uid = line
-                        if not uid or uid.lower() in ("ok", "true"):
+                        print(f"SER << {line}")
+                        sys.stdout.flush()
+                        uid = extract_uid_from_line(line)
+                        if not uid:
                             continue
                         result = process_card(uid)
-                        print(f"SER RFID → {result.get('code')} ok={result.get('ok')} {result.get('error') or result.get('cardUid') or ''}")
+                        print(
+                            f"SER RFID → {result.get('code')} ok={result.get('ok')} "
+                            f"{result.get('error') or result.get('cardUid') or ''}"
+                        )
+                        sys.stdout.flush()
                 except Exception as e:
                     print(f"⚠️  serial RFID: {e} — reintento 3s")
+                    sys.stdout.flush()
                     time.sleep(3)
 
         threading.Thread(target=serial_loop, daemon=True).start()
