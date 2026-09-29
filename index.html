@@ -1797,6 +1797,7 @@
     <p class="vision-hint" id="rfid-lock-msg">Esperando tap en RC522…</p>
     <div class="btn-row" style="margin-top:8px;">
       <button class="btn btn-outline" type="button" id="btn-rfid-cancel">Volver</button>
+      <button class="btn btn-danger" type="button" id="btn-rfid-lock" title="Cerrar acceso RFID">Bloquear</button>
     </div>
   </div>
 </div>
@@ -2291,6 +2292,33 @@ $("btn-rfid-cancel")?.addEventListener("click", () => {
   rfidPendingView = null;
   showRfidLock(false);
   showAppView("stations");
+});
+
+$("btn-rfid-lock")?.addEventListener("click", async () => {
+  try{
+    await setDoc(RFID_GATE_REF(), {
+      unlocked: false,
+      untilMs: 0,
+      uid: null,
+      nombre: null,
+      at: serverTimestamp()
+    }, { merge: true });
+    toast("Acceso RFID bloqueado");
+    rfidPendingView = null;
+    showRfidLock(false);
+    showAppView("stations");
+  }catch(e){
+    // Si rules no permiten write desde cliente, pedir a la Pi
+    toast("No se pudo bloquear desde la web (rules). Usá curl /api/lock en la Pi.");
+  }
+});
+
+$("rfid-pill")?.addEventListener("click", () => {
+  if(isRfidUnlocked()){
+    showRfidLock(true);
+    const msg = $("rfid-lock-msg");
+    if(msg) msg.textContent = "Sesión activa: " + (rfidState.nombre || "") + " — podés bloquear.";
+  }
 });
 
 // Escuchar RFID apenas hay sesión (para el pill)

@@ -195,10 +195,16 @@ def main() -> None:
 
             self._json(404, {"ok": False, "error": "not found"})
 
-    # estado inicial bloqueado
-    lock()
+    # Estado inicial: no bloquees el bind si Firestore falla
+    try:
+        lock()
+        print("Firestore gate → locked")
+    except Exception as e:
+        print(f"⚠️  no se pudo lock inicial en Firestore: {e}")
+
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
-    print(f"RFID gate en http://0.0.0.0:{args.port}  (POST /api/rfid)")
+    print(f"✅ RFID gate ESCUCHANDO http://0.0.0.0:{args.port}  POST /api/rfid")
+    sys.stdout.flush()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
