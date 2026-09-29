@@ -39,7 +39,7 @@ DatosEstacion.PistonOn  := M_Piston1 OR M_Piston2 OR M_Piston3;
 | Offset | Nombre | Uso |
 |---|---|---|
 | 0.0–0.7 | Start…ManualPiston | ManualPiston = **P3 vidrio** |
-| 1.0 | BasculaLista | Espejo / sim → `I_BasculaLista` |
+| 1.0 | BasculaLista | Espejo / sim → `I_BasculaFinal` (báscula al **final**, demo). **No** gatea clasificación |
 | 1.1 | SensorPieza | Espejo / sim → `I_SensorPieza` (trigger cámara) |
 | 1.2 | SensorPlastico | Espejo / sim vía P1 (posición) |
 | 1.3 | SensorAluminio | Espejo / sim vía P2 (posición) |
@@ -53,5 +53,6 @@ DatosEstacion.PistonOn  := M_Piston1 OR M_Piston2 OR M_Piston3;
 > **Visión (Pi 4 + Gemini):** escribe `VisionMaterial` @ 6.0 (`4` si no reconoce).  
 > **Bridge HMI:** escribe bytes 0–5 (no pisa el Int @ 6).  
 > **PLC:** pone `VisionMaterial := 0` al terminar empuje, al dejar pasar desconocido, o por timeout.  
+> **Peso:** opcional / demo (`PesoActualKg`). El ciclo **no** espera báscula lista.  
 > Optimized **OFF**. Tamaño mínimo **8 bytes**.  
 > **Eliminados:** `PistonNExtendido` / `PistonNRetractado` (no hay FC).
