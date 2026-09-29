@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 """
-SIBU — Visión Pi ↔ Firestore (para la página web en cualquier red)
+SIBU — Visión Pi ↔ Firestore (página web, sin :8080)
 
-La web (Firebase Hosting / celular) NO necesita http://IP:8080.
-  - Página escribe  vision_pi/comando  { action: refresh|classify, nonce }
-  - Este servicio (Admin SDK) captura cámara + opcional Gemini
-  - Escribe      vision_pi/estado   { online, jpegBase64, label, code, raw, busy, error, ... }
+  Página → vision_pi/comando { action: refresh|classify, nonce }
+  Pi     → vision_pi/estado  { online, jpegBase64, label, code, busy, error }
 
-Uso:
-  export GEMINI_API_KEY=...
-  cd ~/SIBU && source .venv/bin/activate
-  python costa_rica/vision_firebase.py
-
-Casi no gasta cuota: escucha on_snapshot (solo lee cuando cambia el comando).
+Usa POLLING (fiable). ~1 lectura / 2 s de `comando` (bajo uso).
 """
 
 from __future__ import annotations
@@ -22,7 +15,6 @@ import base64
 import io
 import os
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -98,6 +90,7 @@ def main() -> None:
     p.add_argument("--capture-cmd", default=os.environ.get("SIBU_CAPTURE_CMD", ""))
     p.add_argument("--model", default=os.environ.get("GEMINI_MODEL", "gemini-3.8-flash"))
     p.add_argument("--mock-material", default="")
+    p.add_argument("--poll", type=float, default=2.0, help="Segundos entre lecturas de comando")
     args = p.parse_args()
 
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -105,83 +98,102 @@ def main() -> None:
     if not api_key and not mock:
         print("⚠️  Sin GEMINI_API_KEY (classify fallará; refresh sí funciona)")
 
+    sa = Path(args.service_account)
+    if not sa.is_file():
+        print(f"❌ No está {sa}")
+        sys.exit(1)
+
     if not firebase_admin._apps:
-        firebase_admin.initialize_app(credentials.Certificate(args.service_account))
+        firebase_admin.initialize_app(credentials.Certificate(str(sa)))
     fs = firestore.client()
     estado_ref = fs.collection("vision_pi").document("estado")
     cmd_ref = fs.collection("vision_pi").document("comando")
 
-    lock = threading.Lock()
     last_nonce = None
+    last_hb = 0.0
 
     def set_estado(**fields):
-        payload = {
-            "online": True,
-            "pi": True,
-            "actualizado": firestore.SERVER_TIMESTAMP,
-            **fields,
-        }
-        estado_ref.set(payload, merge=True)
+        estado_ref.set(
+            {
+                "online": True,
+                "pi": True,
+                "actualizado": firestore.SERVER_TIMESTAMP,
+                **fields,
+            },
+            merge=True,
+        )
 
-    def handle(action: str):
-        with lock:
-            set_estado(busy=True, error=None)
-            try:
-                capturar(args.photo_path, args.capture_cmd)
-                b64 = jpeg_b64_thumb(args.photo_path)
-                out = {"jpegBase64": b64, "busy": False, "error": None}
-                if action == "classify":
-                    if mock:
-                        label, code = mock, int(MATERIAL_CODE.get(mock, 4))
-                    elif not api_key:
-                        raise RuntimeError("Falta GEMINI_API_KEY en la Pi")
-                    else:
-                        label, code = clasificar(args.photo_path, args.model, api_key)
-                    out.update(
-                        {
-                            "label": label,
-                            "code": code,
-                            "raw": label,
-                            "visionMaterial": code,
-                        }
-                    )
-                    print(f"classify → {label} ({code})")
+    def handle(action: str) -> None:
+        print(f"→ acción: {action}")
+        set_estado(busy=True, error=None)
+        try:
+            capturar(args.photo_path, args.capture_cmd)
+            b64 = jpeg_b64_thumb(args.photo_path)
+            out = {"jpegBase64": b64, "busy": False, "error": None}
+            if action == "classify":
+                if mock:
+                    label, code = mock, int(MATERIAL_CODE.get(mock, 4))
+                elif not api_key:
+                    raise RuntimeError("Falta GEMINI_API_KEY en la Pi")
                 else:
-                    print("refresh snapshot OK")
-                set_estado(**out)
-            except Exception as e:
-                print(f"⚠️  {e}")
-                set_estado(busy=False, error=str(e))
-
-    def on_cmd(doc_snap, changes, read_time):
-        nonlocal last_nonce
-        if not doc_snap.exists:
-            return
-        data = doc_snap.to_dict() or {}
-        action = (data.get("action") or "").strip().lower()
-        nonce = data.get("nonce")
-        if action not in ("refresh", "classify"):
-            return
-        if nonce is not None and nonce == last_nonce:
-            return
-        last_nonce = nonce
-        # procesar fuera del callback
-        threading.Thread(target=handle, args=(action,), daemon=True).start()
+                    label, code = clasificar(args.photo_path, args.model, api_key)
+                out.update(
+                    {
+                        "label": label,
+                        "code": code,
+                        "raw": label,
+                        "visionMaterial": code,
+                    }
+                )
+                print(f"   classify → {label} ({code})")
+            else:
+                print("   refresh OK")
+            set_estado(**out)
+        except Exception as e:
+            print(f"⚠️  {e}")
+            set_estado(busy=False, error=str(e))
 
     set_estado(busy=False, error=None, label=None, code=0)
-    cmd_ref.on_snapshot(on_cmd)
-    print("Escuchando vision_pi/comando … (Ctrl+C sale)")
-    print("La web SIBU (📷) puede usarse desde Firebase Hosting, sin :8080")
+    print(f"Polling vision_pi/comando cada {args.poll}s …")
+    print(f"Modelo={args.model}  key={'sí' if api_key else 'NO'}")
 
     try:
         while True:
-            # heartbeat online barato (1 write / 60 s)
-            set_estado(online=True)
-            time.sleep(60)
+            now = time.monotonic()
+            if now - last_hb >= 30:
+                set_estado(online=True)
+                last_hb = now
+                print("heartbeat online")
+
+            try:
+                snap = cmd_ref.get()
+                if snap.exists:
+                    data = snap.to_dict() or {}
+                    action = (data.get("action") or "").strip().lower()
+                    nonce = data.get("nonce")
+                    if (
+                        action in ("refresh", "classify")
+                        and nonce is not None
+                        and nonce != last_nonce
+                    ):
+                        last_nonce = nonce
+                        handle(action)
+                        # limpia para no reprocesar
+                        cmd_ref.set(
+                            {"action": "", "doneNonce": nonce, "at": firestore.SERVER_TIMESTAMP},
+                            merge=True,
+                        )
+            except Exception as e:
+                print(f"⚠️  poll: {e}")
+
+            time.sleep(max(0.5, args.poll))
     except KeyboardInterrupt:
         print("\nBye")
         try:
-            estado_ref.set({"online": False, "actualizado": firestore.SERVER_TIMESTAMP}, merge=True)
+            estado_ref.set(
+                {"online": False, "actualizado": firestore.SERVER_TIMESTAMP},
+                merge=True,
+            )
         except Exception:
             pass
 
