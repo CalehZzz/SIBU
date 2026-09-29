@@ -212,6 +212,34 @@
   .vision-key-row input{flex:1;}
   .vision-hint{font-size:12.5px; color:var(--forest-soft); line-height:1.45; margin:8px 0 0;}
 
+  /* ---------- Candado RFID ---------- */
+  .rfid-lock{
+    display:none; position:fixed; inset:0; z-index:80;
+    background:rgba(31,59,45,.55); backdrop-filter:blur(6px);
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .rfid-lock.show{display:flex;}
+  .rfid-card{
+    background:var(--card); border-radius:22px; padding:28px 22px; max-width:360px; width:100%;
+    box-shadow:var(--shadow); text-align:center;
+  }
+  .rfid-card .rfid-ico{font-size:48px; margin-bottom:8px;}
+  .rfid-card h2{font-size:22px; margin-bottom:6px;}
+  .rfid-card p{color:var(--forest-soft); font-size:14px; line-height:1.45; margin:0 0 14px;}
+  .rfid-pulse{
+    width:64px; height:64px; margin:10px auto 16px; border-radius:50%;
+    border:3px solid var(--leaf); animation:rfidPulse 1.4s ease-in-out infinite;
+  }
+  @keyframes rfidPulse{
+    0%,100%{ transform:scale(1); opacity:1; }
+    50%{ transform:scale(1.12); opacity:.55; }
+  }
+  .rfid-status-pill{
+    display:none; font-size:11px; font-weight:800; padding:4px 10px; border-radius:999px;
+    background:#E6F5EA; color:var(--leaf-dark); margin-left:8px; vertical-align:middle;
+  }
+  .rfid-status-pill.on{display:inline-block;}
+
   .plc-chip{
     background:var(--cream); border-radius:12px; padding:8px 10px;
     font-size:12px; color:var(--forest-soft); font-weight:700;
@@ -1279,7 +1307,7 @@
   <div id="app-shell" class="hidden">
     <div class="demo-banner">DEMO — Prototipo SIBU · Colegio Don Bosco · No es versión de producción</div>
     <div class="topbar">
-      <div class="brand"><span class="logo">♻️</span><span>SIBU</span></div>
+      <div class="brand"><span class="logo">♻️</span><span>SIBU</span><span class="rfid-status-pill" id="rfid-pill">RFID OK</span></div>
       <div class="navpills">
         <button class="pill" data-view="stations">🏠</button>
         <button class="pill" data-view="vision">📷</button>
@@ -1759,6 +1787,20 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Candado RFID para HMI / cámara / PLC real -->
+<div class="rfid-lock" id="rfid-lock" aria-hidden="true">
+  <div class="rfid-card">
+    <div class="rfid-ico">💳</div>
+    <h2>Acceso con tarjeta</h2>
+    <p>Para abrir el panel de estación (HMI, cámara o PLC) acercá tu tarjeta RFID al lector.</p>
+    <div class="rfid-pulse" aria-hidden="true"></div>
+    <p class="vision-hint" id="rfid-lock-msg">Esperando tap en RC522…</p>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-outline" type="button" id="btn-rfid-cancel">Volver</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 /* =========================================================================
    SIBU — App de clasificación + pesaje (innovación del reto Siemens)
@@ -1877,6 +1919,16 @@ function showOnly(id){
 }
 
 function showAppView(viewName){
+  // Candado RFID: HMI / cámara / PLC real
+  if(RFID_PROTECTED.has(viewName) && !isRfidUnlocked()){
+    rfidPendingView = viewName;
+    showRfidLock(true);
+    // no entramos a la vista aún; nos quedamos donde estábamos
+    return;
+  }
+  rfidPendingView = null;
+  showRfidLock(false);
+
   ["stations","live","summary","history","admin","hmi","plc-real","vision"].forEach(v => {
     $("view-" + v)?.classList.toggle("hidden", v !== viewName);
   });
@@ -1889,7 +1941,6 @@ function showAppView(viewName){
   if(viewName === "hmi") ensureHmiListen();
   if(viewName === "plc-real") updateRealBridgeCmd();
   if(viewName === "vision") initVisionPanel();
-  if(viewName !== "vision"){ /* keep firestore listener; cheap */ }
 }
 
 function hmiPanelEl(){
@@ -2092,6 +2143,7 @@ onAuthStateChanged(auth, async (user) => {
     await Promise.all([cargarPrecios(), cargarEstaciones()]);
     $("app-shell").classList.remove("hidden");
     ["view-loading","view-login"].forEach(v => $(v)?.classList.add("hidden"));
+    ensureRfidListen();
     showAppView("stations");
   } else {
     // Sin Google: no se puede entrar
@@ -2137,10 +2189,112 @@ document.querySelectorAll(".navpills .pill[data-view]").forEach(btn => {
     const v = btn.dataset.view;
     if(v === "history") renderHistorial();
     if(v === "admin") renderAdmin();
-    if(v === "plc-real") ensureRealListen();
+    if(v === "plc-real"){
+      if(!isRfidUnlocked()){
+        rfidPendingView = "plc-real";
+        showRfidLock(true);
+        return;
+      }
+      ensureRealListen();
+    }
     showAppView(v);
   };
 });
+
+/* -------------------------------------------------------------------------
+   RFID GATE — ESP32 RC522 → Pi → rfid_gate/sibu → desbloquea paneles
+   ------------------------------------------------------------------------- */
+const RFID_PROTECTED = new Set(["hmi", "vision", "plc-real"]);
+const RFID_GATE_REF = () => doc(db, "rfid_gate", "sibu");
+let rfidUnsub = null;
+let rfidState = { unlocked: false, untilMs: 0, nombre: null, uid: null };
+let rfidPendingView = null;
+let rfidExpireTimer = null;
+
+function isRfidUnlocked(){
+  return !!(rfidState.unlocked && rfidState.untilMs && Date.now() < rfidState.untilMs);
+}
+
+function showRfidLock(on){
+  const el = $("rfid-lock");
+  if(!el) return;
+  el.classList.toggle("show", !!on);
+  el.setAttribute("aria-hidden", on ? "false" : "true");
+  if(on) ensureRfidListen();
+}
+
+function updateRfidPill(){
+  const pill = $("rfid-pill");
+  if(!pill) return;
+  const ok = isRfidUnlocked();
+  pill.classList.toggle("on", ok);
+  if(ok){
+    const left = Math.max(0, Math.round((rfidState.untilMs - Date.now()) / 1000));
+    pill.textContent = (rfidState.nombre || "RFID") + " · " + left + "s";
+  }
+}
+
+function scheduleRfidExpire(){
+  if(rfidExpireTimer) clearInterval(rfidExpireTimer);
+  rfidExpireTimer = setInterval(() => {
+    updateRfidPill();
+    if(!isRfidUnlocked()){
+      clearInterval(rfidExpireTimer);
+      rfidExpireTimer = null;
+      // si estamos en vista protegida, cerrar
+      const active = document.querySelector(".navpills .pill.active");
+      const v = active?.dataset?.view;
+      if(v && RFID_PROTECTED.has(v)){
+        toast("Sesión RFID expiró");
+        showAppView("stations");
+      }
+      showRfidLock(false);
+    }
+  }, 1000);
+}
+
+function ensureRfidListen(){
+  if(rfidUnsub) return;
+  rfidUnsub = onSnapshot(RFID_GATE_REF(), (snap) => {
+    const d = snap.exists() ? (snap.data() || {}) : {};
+    rfidState = {
+      unlocked: !!d.unlocked,
+      untilMs: Number(d.untilMs) || 0,
+      nombre: d.nombre || null,
+      uid: d.uid || null
+    };
+    updateRfidPill();
+    const msg = $("rfid-lock-msg");
+    if(isRfidUnlocked()){
+      if(msg) msg.textContent = "Acceso: " + (rfidState.nombre || rfidState.uid || "OK");
+      scheduleRfidExpire();
+      showRfidLock(false);
+      if(rfidPendingView){
+        const next = rfidPendingView;
+        rfidPendingView = null;
+        if(next === "plc-real") ensureRealListen();
+        if(next === "hmi") ensureHmiListen();
+        showAppView(next);
+        toast("RFID · " + (rfidState.nombre || "desbloqueado"));
+      }
+    } else {
+      if(msg) msg.textContent = "Esperando tap en RC522…";
+    }
+  }, (err) => {
+    console.error(err);
+    const msg = $("rfid-lock-msg");
+    if(msg) msg.textContent = "Firestore RFID: " + (err.message || err);
+  });
+}
+
+$("btn-rfid-cancel")?.addEventListener("click", () => {
+  rfidPendingView = null;
+  showRfidLock(false);
+  showAppView("stations");
+});
+
+// Escuchar RFID apenas hay sesión (para el pill)
+// (se llama desde onAuthStateChanged vía ensureRfidListen al primer panel)
 
 /* -------------------------------------------------------------------------
    PRUEBA VISIÓN — cámara Pi vía Firestore (sirve desde la página SIBU)
