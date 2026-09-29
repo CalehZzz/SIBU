@@ -1278,6 +1278,39 @@
   .add-station-form input{padding:10px 12px; border-radius:12px; border:2px solid var(--cream-2); font-family:'Nunito'; font-size:14px;}
 
   .real-card{margin-bottom:14px;}
+  .bins-lamp{
+    display:inline-flex; align-items:center; gap:8px; font-weight:800; font-size:13px;
+    padding:8px 12px; border-radius:12px; background:var(--cream);
+  }
+  .bins-lamp .dot{
+    width:14px; height:14px; border-radius:50%; background:#9AA6C4;
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);
+  }
+  .bins-lamp.green .dot{background:#3D9B5F;}
+  .bins-lamp.yellow .dot{background:#E6B422;}
+  .bins-lamp.red .dot{background:#D64545; animation:rfidPulse 1s ease-in-out infinite;}
+  .bins-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;
+  }
+  @media(max-width:520px){ .bins-grid{grid-template-columns:1fr;} }
+  .bin-card{
+    background:var(--cream); border-radius:14px; padding:12px;
+  }
+  .bin-card.lleno{outline:2px solid #E6B422;}
+  .bin-card.lleno.rechazo{outline-color:#D64545;}
+  .bin-card .bin-name{font-weight:800; font-size:13px; color:var(--forest); margin-bottom:6px;}
+  .bin-card .bin-meta{font-size:11px; color:var(--forest-soft); margin-top:6px;}
+  .bin-bar{
+    height:12px; border-radius:999px; background:#E8E2D4; overflow:hidden;
+  }
+  .bin-bar > span{
+    display:block; height:100%; width:0%; border-radius:999px; background:var(--leaf);
+    transition:width .35s ease;
+  }
+  .bin-card.lleno .bin-bar > span{background:#E6B422;}
+  .bin-card.lleno.rechazo .bin-bar > span{background:#D64545;}
+  .bin-pct{font-family:'JetBrains Mono',monospace; font-weight:800; font-size:18px; color:var(--forest);}
+
   .real-cmd{
     margin:0; padding:12px 14px; background:var(--cream); border-radius:12px;
     font-size:12.5px; overflow-x:auto; color:var(--forest); border:2px solid var(--cream-2);
@@ -1746,6 +1779,44 @@
           </div>
         </div>
 
+        <div class="card real-card" id="bins-panel">
+          <div class="section-title">Botes · HC-SR04 (Arduino)</div>
+          <p style="font-size:13px; color:var(--forest-soft); line-height:1.45; margin:0 0 10px;">
+            Si un material está <b>lleno</b> → lámpara <b>amarilla</b> y ese material va a <b>rechazo</b>.
+            Si <b>rechazo</b> está lleno → lámpara <b>roja</b> y se detiene todo.
+          </p>
+          <div class="bins-lamp green" id="bins-lamp"><span class="dot"></span><span id="bins-lamp-text">Esperando Arduino…</span></div>
+          <div class="bins-grid" id="bins-grid">
+            <div class="bin-card" id="bin-plastico">
+              <div class="bin-name">🥤 Plástico <span style="font-weight:600;color:var(--forest-soft);">(LCD ejemplo)</span></div>
+              <div class="bin-pct" id="bin-plastico-pct">—%</div>
+              <div class="bin-bar"><span id="bin-plastico-bar"></span></div>
+              <div class="bin-meta" id="bin-plastico-meta">Sin datos</div>
+            </div>
+            <div class="bin-card" id="bin-aluminio">
+              <div class="bin-name">🥫 Aluminio</div>
+              <div class="bin-pct" id="bin-aluminio-pct">—%</div>
+              <div class="bin-bar"><span id="bin-aluminio-bar"></span></div>
+              <div class="bin-meta" id="bin-aluminio-meta">Sin datos</div>
+            </div>
+            <div class="bin-card" id="bin-vidrio">
+              <div class="bin-name">🍾 Vidrio</div>
+              <div class="bin-pct" id="bin-vidrio-pct">—%</div>
+              <div class="bin-bar"><span id="bin-vidrio-bar"></span></div>
+              <div class="bin-meta" id="bin-vidrio-meta">Sin datos</div>
+            </div>
+            <div class="bin-card" id="bin-rechazo">
+              <div class="bin-name">🚫 Rechazo</div>
+              <div class="bin-pct" id="bin-rechazo-pct">—%</div>
+              <div class="bin-bar"><span id="bin-rechazo-bar"></span></div>
+              <div class="bin-meta" id="bin-rechazo-meta">Sin datos</div>
+            </div>
+          </div>
+          <p class="vision-hint" style="margin-top:12px;" id="bins-status">
+            Servicio Pi: <span class="mono">sibu-bins</span> · sketch <span class="mono">costa_rica/arduino_bins/</span>
+          </p>
+        </div>
+
         <div class="btn-row">
           <button class="btn btn-outline" id="btn-real-listen" type="button">Escuchar estación real</button>
           <button class="btn btn-primary" id="btn-real-hmi" type="button">Abrir HMI (modo real)</button>
@@ -1995,7 +2066,10 @@ function showAppView(viewName){
   $("app-shell")?.classList.toggle("hmi-mode", viewName === "hmi");
   if(viewName !== "hmi") exitHmiFullscreen();
   if(viewName === "hmi") ensureHmiListen();
-  if(viewName === "plc-real") updateRealBridgeCmd();
+  if(viewName === "plc-real"){
+    updateRealBridgeCmd();
+    ensureBinsListen();
+  }
   if(viewName === "vision") initVisionPanel();
 }
 
@@ -3151,6 +3225,77 @@ function renderRealPanel(data){
   if($("real-alarma")) $("real-alarma").textContent = plc.alarma ? "ACTIVA" : "OK";
   if($("real-emergencia")) $("real-emergencia").textContent = plc.emergencia ? "ACTIVA" : "OK";
   updateTripleMachineStage("real", plc);
+}
+
+/* -------------------------------------------------------------------------
+   BOTES HC-SR04 — bins_pi/estado (Arduino → Pi :8082 → Firestore)
+   ------------------------------------------------------------------------- */
+const BINS_ESTADO = () => doc(db, "bins_pi", "estado");
+let binsUnsub = null;
+
+function paintBin(key, data, isRechazo){
+  const d = data || {};
+  const pct = Math.max(0, Math.min(100, Number(d.pct) || 0));
+  const lleno = !!d.lleno;
+  const card = $("bin-" + key);
+  const pctEl = $("bin-" + key + "-pct");
+  const bar = $("bin-" + key + "-bar");
+  const meta = $("bin-" + key + "-meta");
+  card?.classList.toggle("lleno", lleno);
+  card?.classList.toggle("rechazo", !!(lleno && isRechazo));
+  if(pctEl) pctEl.textContent = pct + "%";
+  if(bar) bar.style.width = pct + "%";
+  if(meta){
+    const cm = d.cm;
+    meta.textContent = lleno
+      ? ("LLENO" + (cm != null && cm >= 0 ? ` · ${Number(cm).toFixed(1)} cm` : ""))
+      : (cm != null && cm >= 0 ? `${Number(cm).toFixed(1)} cm` : "Sin eco / sin datos");
+  }
+}
+
+function renderBinsPanel(raw){
+  const lamp = $("bins-lamp");
+  const lampTxt = $("bins-lamp-text");
+  const st = $("bins-status");
+  if(!raw){
+    lamp?.classList.remove("green","yellow","red");
+    lamp?.classList.add("green");
+    if(lampTxt) lampTxt.textContent = "Sin datos — ¿corre sibu-bins?";
+    if(st) st.textContent = "Firestore bins_pi/estado vacío";
+    return;
+  }
+  const color = String(raw.lamp || "green");
+  lamp?.classList.remove("green","yellow","red");
+  lamp?.classList.add(color === "red" ? "red" : color === "yellow" ? "yellow" : "green");
+  const divert = raw.divert || {};
+  let msg = "OK · todos los botes con espacio";
+  if(raw.stop || color === "red"){
+    msg = "STOP · bote de rechazo LLENO";
+  } else if(color === "yellow"){
+    const diverted = ["plastico","aluminio","vidrio"].filter(k => divert[k]).map(k => k);
+    msg = "Desvío a rechazo: " + (diverted.length ? diverted.join(", ") : "material(es) lleno(s)");
+  }
+  if(lampTxt) lampTxt.textContent = msg;
+  paintBin("plastico", raw.plastico, false);
+  paintBin("aluminio", raw.aluminio, false);
+  paintBin("vidrio", raw.vidrio, false);
+  paintBin("rechazo", raw.rechazo, true);
+  if(st){
+    st.textContent = raw.online
+      ? ("En vivo · " + (raw.atMs ? new Date(raw.atMs).toLocaleTimeString() : ""))
+      : "Último frame recibido";
+  }
+}
+
+function ensureBinsListen(){
+  if(binsUnsub) return;
+  binsUnsub = onSnapshot(BINS_ESTADO(), (snap) => {
+    renderBinsPanel(snap.exists() ? snap.data() : null);
+  }, (err) => {
+    console.error(err);
+    const st = $("bins-status");
+    if(st) st.textContent = "Firestore bins: " + (err.message || err);
+  });
 }
 
 function ensureRealListen(){

@@ -67,5 +67,11 @@ service cloud.firestore {
       allow read: if signedIn() && resource.data.authUid == request.auth.uid;
       allow write: if isAdmin();
     }
+
+    // Niveles de botes (Arduino HC-SR04 → Pi Admin SDK)
+    match /bins_pi/{doc} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
   }
 }

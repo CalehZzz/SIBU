@@ -1,0 +1,16 @@
+[Unit]
+Description=SIBU bins levels (Arduino HC-SR04 -> Firestore)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sibucr
+WorkingDirectory=/home/sibucr/SIBU
+EnvironmentFile=-/home/sibucr/SIBU/costa_rica/sibu.env
+ExecStart=/home/sibucr/SIBU/.venv/bin/python costa_rica/bins_firebase.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

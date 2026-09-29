@@ -49,7 +49,8 @@ match /vision_pi/{doc} {
 
 | Comando | Qué |
 |---|---|
-| `bash costa_rica/install_services.sh web` | visión Firestore (página) |
+| `bash costa_rica/install_services.sh web` | visión Firestore + RFID + **bins** |
+| `bash costa_rica/install_services.sh bins` | solo niveles HC-SR04 :8082 |
 | `bash costa_rica/install_services.sh http` | opcional :8080 LAN |
 | `bash costa_rica/install_services.sh all` | web + bridge + vision→PLC |
 | `bash costa_rica/install_services.sh stop` | apaga todo |
