@@ -12,12 +12,13 @@ PLC real: CPU **1214C** → carpeta [`plc_real/`](plc_real/).
 HMI usable + app = web (plus); atajo lab sin AS: [`docs/11_SIN_AS_SOLO_WEB.md`](docs/11_SIN_AS_SOLO_WEB.md).
 
 1. [`docs/12_RUBRICA_CAPAS.md`](docs/12_RUBRICA_CAPAS.md) — **qué es obligatorio vs plus**  
-2. [`docs/02_GUIA_AUTOMATION_STUDIO.md`](docs/02_GUIA_AUTOMATION_STUDIO.md) — AS (rúbrica)  
-3. [`tia/TABLA_TAGS_DESDE_CERO.md`](tia/TABLA_TAGS_DESDE_CERO.md) — tags (3 pistones)  
-4. [`tia/MAPA_DB_HMI.md`](tia/MAPA_DB_HMI.md) — DB comandos + sensores  
-5. [`tia/MAPA_IO_Y_DB.md`](tia/MAPA_IO_Y_DB.md) — DatosEstacion  
-6. [`docs/GUION_DEFENSA_15MIN.md`](docs/GUION_DEFENSA_15MIN.md) — defensa 15 min  
-7. Resto en [`docs/`](docs/)
+2. [`docs/13_CONECTAR_TODO.md`](docs/13_CONECTAR_TODO.md) — **cómo conectar AS + TIA + físico + web**  
+3. [`docs/02_GUIA_AUTOMATION_STUDIO.md`](docs/02_GUIA_AUTOMATION_STUDIO.md) — AS (rúbrica)  
+4. [`tia/TABLA_TAGS_DESDE_CERO.md`](tia/TABLA_TAGS_DESDE_CERO.md) — tags (3 pistones)  
+5. [`tia/MAPA_DB_HMI.md`](tia/MAPA_DB_HMI.md) — DB comandos + sensores  
+6. [`tia/MAPA_IO_Y_DB.md`](tia/MAPA_IO_Y_DB.md) — DatosEstacion  
+7. [`docs/GUION_DEFENSA_15MIN.md`](docs/GUION_DEFENSA_15MIN.md) — defensa 15 min  
+8. Resto en [`docs/`](docs/)
 ### Bridge con PLCSIM Advanced (demo)
 
 ```bash

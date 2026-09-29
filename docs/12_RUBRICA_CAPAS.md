@@ -25,6 +25,8 @@ Esos mensajes chocan con la rúbrica aunque la mesa Costa Rica se mande por Fire
 
 ## Cómo se demuestran las tres capas
 
+**Paso a paso de conexión:** [`13_CONECTAR_TODO.md`](13_CONECTAR_TODO.md)
+
 ```
 Demo software (puntos AS + TIA + HMI)
   AS 10  ←→  KEP  ←→  PLCSIM (1511C)  ←→  bridge  ←→  HMI web

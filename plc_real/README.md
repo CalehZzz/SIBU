@@ -5,7 +5,7 @@ No reutilices el hardware config del 1511C: crea un proyecto TIA nuevo con CPU *
 
 **Actuadores neumáticos (real):** 3 cilindros **doble efecto** — P1 plástico · P2 latas · P3 vidrio · **6 solenoides** (Ext/Ret) · **sin** FC de posición.  
 **Semáforo:** 3 relés 24 V (`Q_Lampara*`) → lámparas 220 V. Comunes **1L y 2L → 24 V**.  
-**Operador:** 100 % desde la web (sin pulsadores físicos). En mesa: sensores de material + actuadores.
+**Operador de mesa:** HMI web (plus). En sim: AS + KEP. Ver [`docs/13_CONECTAR_TODO.md`](../docs/13_CONECTAR_TODO.md).
 
 ```
 Página SIBU / HMI web  (Start, Stop, manual, emergencia…)
