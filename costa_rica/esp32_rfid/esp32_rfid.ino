@@ -27,7 +27,7 @@
 const char* WIFI_SSID = "TU_HOTSPOT_O_WIFI";
 const char* WIFI_PASS = "TU_PASSWORD";
 // IP de la Pi en la misma red (wlan hotspot o LAN)
-const char* PI_HOST   = "172.20.10.2";  // cambiá si hostname -I dice otra
+const char* PI_HOST   = "172.20.10.3";  // hostname -I en la Pi (cambia si el hotspot renueva IP)
 const int   PI_PORT   = 8081;
 // ==========================
 
