@@ -1,5 +1,15 @@
 # Costa Rica — Visión Gemini + Raspberry Pi 4
 
+## RFID (HMI / cámara)
+
+Ver `costa_rica/esp32_rfid/README.md`.
+
+```bash
+# en sibu.env: RFID_ALLOW=UIDHEX:Nombre
+bash costa_rica/install_services.sh web   # incluye sibu-rfid-gate
+curl -X POST http://127.0.0.1:8081/api/rfid -H 'Content-Type: application/json' -d '{"uid":"TEST"}'
+```
+
 ## Página SIBU 📷 (recomendado — cualquier red)
 
 La web habla con la Pi **por Firestore** (no hace falta `http://IP:8080`).

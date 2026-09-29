@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Instala servicios systemd en la Pi (corren sin PC).
-#   bash costa_rica/install_services.sh web     # RECOMENDADO: visión vía Firestore (página SIBU)
+#   bash costa_rica/install_services.sh web     # visión Firestore + RFID gate
+#   bash costa_rica/install_services.sh rfid    # solo RFID
 #   bash costa_rica/install_services.sh http    # opcional :8080 LAN
-#   bash costa_rica/install_services.sh all     # web + bridge + vision-plc (cuando TIA OK)
+#   bash costa_rica/install_services.sh all     # web + rfid + bridge + vision-plc
 #   bash costa_rica/install_services.sh stop
 
 set -euo pipefail
@@ -16,9 +17,13 @@ if [[ ! -f "$ROOT/costa_rica/sibu.env" ]]; then
 fi
 
 if [[ ! -f "$ROOT/serviceAccountKey.json" ]]; then
-  echo "Falta serviceAccountKey.json en $ROOT (necesario para vision_firebase / bridge)"
+  echo "Falta serviceAccountKey.json en $ROOT"
   exit 1
 fi
+
+# defaults si faltan en env (systemd vacío rompe ExecStart)
+grep -q '^RFID_PORT=' "$ROOT/costa_rica/sibu.env" 2>/dev/null || echo 'RFID_PORT=8081' >> "$ROOT/costa_rica/sibu.env"
+grep -q '^RFID_TTL_SEC=' "$ROOT/costa_rica/sibu.env" 2>/dev/null || echo 'RFID_TTL_SEC=300' >> "$ROOT/costa_rica/sibu.env"
 
 sudo cp "$ROOT/costa_rica/systemd/"*.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -31,17 +36,23 @@ enable_one() {
 
 case "$MODE" in
   web)
-    echo ">>> Visión vía Firestore (página SIBU 📷, sin :8080)"
+    echo ">>> Visión Firestore + RFID gate"
     sudo systemctl disable --now sibu-vision-http.service 2>/dev/null || true
     enable_one sibu-vision-firebase.service
+    enable_one sibu-rfid-gate.service
+    ;;
+  rfid)
+    echo ">>> Solo RFID gate :8081"
+    enable_one sibu-rfid-gate.service
     ;;
   http)
-    echo ">>> Solo vision-http :8080 (misma LAN)"
+    echo ">>> Solo vision-http :8080"
     enable_one sibu-vision-http.service
     ;;
   all)
-    echo ">>> firebase vision + bridge + vision-plc"
+    echo ">>> vision firebase + rfid + bridge + vision-plc"
     enable_one sibu-vision-firebase.service
+    enable_one sibu-rfid-gate.service
     enable_one sibu-bridge.service
     enable_one sibu-vision-plc.service
     ;;
@@ -49,12 +60,13 @@ case "$MODE" in
     sudo systemctl disable --now \
       sibu-vision-http.service \
       sibu-vision-firebase.service \
+      sibu-rfid-gate.service \
       sibu-bridge.service \
       sibu-vision-plc.service 2>/dev/null || true
     echo "Servicios detenidos"
     ;;
   *)
-    echo "Uso: $0 [web|http|all|stop]"
+    echo "Uso: $0 [web|rfid|http|all|stop]"
     exit 1
     ;;
 esac
