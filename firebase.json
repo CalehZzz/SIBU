@@ -1,0 +1,21 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "**/*.py",
+      "**/plc_real/**",
+      "**/tia/**",
+      "**/docs/**",
+      "**/costa_rica/**",
+      "**/automation_studio/**",
+      "serviceAccountKey.json",
+      "costa_rica/sibu.env"
+    ],
+    "rewrites": [
+      { "source": "**", "destination": "/index.html" }
+    ]
+  }
+}

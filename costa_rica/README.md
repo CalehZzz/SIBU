@@ -1,6 +1,8 @@
-# Costa Rica — Visión Gemini + Raspberry Pi 4 + PLC
+# Costa Rica — Visión Gemini + Raspberry Pi 4
 
-## Autostart en la Pi (sin PC)
+## Página SIBU 📷 (recomendado — cualquier red)
+
+La web habla con la Pi **por Firestore** (no hace falta `http://IP:8080`).
 
 ```bash
 cd ~/SIBU
@@ -8,79 +10,44 @@ git pull origin cursor/vision-test-page-c9e3
 cp -n costa_rica/sibu.env.example costa_rica/sibu.env
 nano costa_rica/sibu.env   # GEMINI_API_KEY + PLC_IP
 
-# HOY (sin TIA / sin quemar Firestore): solo cámara+Gemini web
-bash costa_rica/install_services.sh http
-
-# MAÑANA (PUT/GET + DBs OK): los tres
-# bash costa_rica/install_services.sh all
-
-# Parar todo:
-# bash costa_rica/install_services.sh stop
+# serviceAccountKey.json debe estar en ~/SIBU/
+bash costa_rica/install_services.sh web
 ```
 
-Logs:
-```bash
-journalctl -u sibu-vision-http -f
-journalctl -u sibu-bridge -f
-journalctl -u sibu-vision-plc -f
-```
+Luego abrí la **app SIBU normal** (Firebase Hosting) → login → **📷** → Actualizar / Identificar.
 
-### Firestore (cuota)
-- `vision_http` / `vision_gemini`: **0** lecturas Firebase.
-- `plc_bridge`: por defecto **1 s** de intervalo; **solo escribe** `sesiones_activas` si cambió el estado.
-- Si el PLC no tiene DBs aún: **no actives el bridge** (sigue haciendo `get` de `hmi_comandos`). Usá `install_services.sh http`.
+### Reglas Firestore (si falla permiso)
 
-## Prueba desde la web (cámara de la Pi, **sin PLC**)
-
-En la Pi (API key ya exportada):
-
-```bash
-cd ~/SIBU
-source .venv/bin/activate
-export GEMINI_API_KEY="TU_KEY"
-# CSI:
-python costa_rica/vision_http.py --port 8080 --capture-cmd 'libcamera-still -n -t 1 -o {path}'
-# USB / OpenCV:
-# python costa_rica/vision_http.py --port 8080
-```
-
-En el celular/PC (misma red que la Pi):
-
-1. Abrí `http://IP_DE_LA_PI:8080/`
-2. Nav **📷**
-3. URL = `http://IP_DE_LA_PI:8080` → Probar conexión
-4. **Actualizar vista** / **Identificar con Gemini (Pi)**
-
-No hace falta PLC ni `plc_bridge` para esta prueba.
-
----
-
-## Estación real (con PLC)
+En Firebase Console → Firestore → Rules, agregá algo como:
 
 ```
-Cámara → Raspberry Pi 4
-           ├─ vision_http.py     (pruebas web, sin PLC)
-           ├─ vision_gemini.py   (I_SensorPieza → Gemini → VisionMaterial)
-           └─ plc_bridge_real.py (HMI ↔ PLC ↔ Firestore)
+match /vision_pi/{doc} {
+  allow read: if request.auth != null;
+  allow write: if request.auth != null;
+}
 ```
 
-| Archivo | Qué |
+(La Pi usa Admin SDK y no depende de esas rules.)
+
+### Cuota
+- Listener `on_snapshot` + comandos solo al tocar botones (bajo uso).
+- Heartbeat online 1 write/min.
+- **No** actives `sibu-bridge` hasta que TIA tenga PUT/GET + DBs.
+
+## Autostart
+
+| Comando | Qué |
 |---|---|
-| `QUE_NECESITO_GEMINI.md` | Lista para la API |
-| `vision_http.py` | HTTP snapshot + classify (web 📷) |
-| `vision_gemini.py` | Loop estación → escribe PLC |
-| `../plc_real/NETWORKS_LAD.md` | Ladder visión + sensor |
-
-### Arranque estación (2–3 procesos)
+| `bash costa_rica/install_services.sh web` | visión Firestore (página) |
+| `bash costa_rica/install_services.sh http` | opcional :8080 LAN |
+| `bash costa_rica/install_services.sh all` | web + bridge + vision→PLC |
+| `bash costa_rica/install_services.sh stop` | apaga todo |
 
 ```bash
-# Terminal 1 — HMI ↔ PLC ↔ web
-python plc_real/plc_bridge_real.py --ip 192.168.0.10
-
-# Terminal 2 — cámara → Gemini → VisionMaterial
-export GEMINI_API_KEY="tu_key"
-python costa_rica/vision_gemini.py --ip 192.168.0.10
-
-# Opcional — panel 📷 en el navegador
-python costa_rica/vision_http.py --port 8080 --capture-cmd 'libcamera-still -n -t 1 -o {path}'
+systemctl status sibu-vision-firebase
+journalctl -u sibu-vision-firebase -f
 ```
+
+## PLC (mañana con TIA)
+
+Ver `plc_real/NETWORKS_LAD.md` · IP tipica PLC `192.168.0.1` · Pi eth0 `192.168.0.20`.
