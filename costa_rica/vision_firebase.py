@@ -138,10 +138,14 @@ def main() -> None:
     cam = None if args.capture_cmd else UsbCam(args.cam_index)
     gemini_model = None
     if api_key and not mock:
+        print("Cargando cliente Gemini…")
+        sys.stdout.flush()
         import google.generativeai as genai
 
         genai.configure(api_key=api_key)
         gemini_model = genai.GenerativeModel(args.model)
+        print("Gemini OK")
+        sys.stdout.flush()
 
     last_nonce = None
     last_hb = 0.0
@@ -209,15 +213,13 @@ def main() -> None:
             print(f"⚠️  {e}")
             set_estado(busy=False, error=str(e))
 
-    if cam is not None:
-        try:
-            cam.open()
-        except Exception as e:
-            print(f"⚠️  cámara al inicio: {e} (reintentará al capturar)")
+    # No abrir la cámara al arranque (en algunas USB se cuelga VideoCapture).
+    # Se abre en el primer refresh/classify.
 
     set_estado(busy=False, error=None, label=None, code=0)
     print(f"Polling vision_pi/comando cada {args.poll}s …")
     print(f"Modelo={args.model}  key={'sí' if api_key else 'NO'}")
+    sys.stdout.flush()
 
     try:
         while True:
