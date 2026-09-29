@@ -1278,6 +1278,57 @@
   .add-station-form input{padding:10px 12px; border-radius:12px; border:2px solid var(--cream-2); font-family:'Nunito'; font-size:14px;}
 
   .real-card{margin-bottom:14px;}
+  .bins-lamp{
+    display:inline-flex; align-items:center; gap:8px; font-weight:800; font-size:13px;
+    padding:8px 12px; border-radius:12px; background:var(--cream);
+  }
+  .bins-lamp .dot{
+    width:14px; height:14px; border-radius:50%; background:#9AA6C4;
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);
+  }
+  .bins-lamp.green .dot{background:#3D9B5F;}
+  .bins-lamp.yellow .dot{background:#E6B422;}
+  .bins-lamp.red .dot{background:#D64545; animation:rfidPulse 1s ease-in-out infinite;}
+  .bins-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;
+  }
+  @media(max-width:520px){ .bins-grid{grid-template-columns:1fr;} }
+  .bin-card{
+    background:var(--cream); border-radius:14px; padding:12px;
+  }
+  .bin-card.lleno{outline:2px solid #E6B422;}
+  .bin-card.lleno.rechazo{outline-color:#D64545;}
+  .bin-card .bin-name{font-weight:800; font-size:13px; color:var(--forest); margin-bottom:6px;}
+  .bin-card .bin-meta{font-size:11px; color:var(--forest-soft); margin-top:6px;}
+  .bin-bar{
+    height:12px; border-radius:999px; background:#E8E2D4; overflow:hidden;
+  }
+  .bin-bar > span{
+    display:block; height:100%; width:0%; border-radius:999px; background:var(--leaf);
+    transition:width .35s ease;
+  }
+  .bin-card.lleno .bin-bar > span{background:#E6B422;}
+  .bin-card.lleno.rechazo .bin-bar > span{background:#D64545;}
+  .bin-pct{font-family:'JetBrains Mono',monospace; font-weight:800; font-size:18px; color:var(--forest);}
+  .bin-card.off{
+    opacity:.55; filter:grayscale(.35);
+  }
+  .bin-card.off .bin-bar > span{width:0 !important; background:#B8B0A0;}
+  .bin-card .bin-badge{
+    display:inline-block; font-size:10px; font-weight:800; letter-spacing:.04em;
+    text-transform:uppercase; padding:2px 7px; border-radius:999px; margin-left:6px;
+    vertical-align:middle;
+  }
+  .bin-badge.on{background:#E6F5EA; color:var(--leaf-dark);}
+  .bin-badge.off{background:#EDE8DC; color:#8A7A5C;}
+  .bins-peso-box{
+    margin-top:10px; background:var(--cream); border-radius:14px; padding:12px 14px;
+    display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+  }
+  .bins-peso-box .lab{font-size:12px; font-weight:800; color:var(--forest-soft); text-transform:uppercase; letter-spacing:.04em;}
+  .bins-peso-box .val{font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:800; color:var(--forest);}
+
+
   .real-cmd{
     margin:0; padding:12px 14px; background:var(--cream); border-radius:12px;
     font-size:12.5px; overflow-x:auto; color:var(--forest); border:2px solid var(--cream-2);
@@ -1746,6 +1797,48 @@
           </div>
         </div>
 
+        <div class="card real-card" id="bins-panel">
+          <div class="section-title">Botes + báscula · ESP32 (demo)</div>
+          <p style="font-size:13px; color:var(--forest-soft); line-height:1.45; margin:0 0 10px;">
+            Conectados: HC <b>plástico</b> + HC <b>rechazo</b>, LCD (solo plástico) y báscula HX711.
+            Aluminio y vidrio están <b>desconectados</b> en esta demo.
+          </p>
+          <div class="bins-lamp green" id="bins-lamp"><span class="dot"></span><span id="bins-lamp-text">Esperando ESP32…</span></div>
+          <div class="bins-peso-box">
+            <span class="lab">Peso plástico · HX711</span>
+            <span class="val" id="bins-peso">— kg</span>
+          </div>
+          <div class="bins-grid" id="bins-grid">
+            <div class="bin-card" id="bin-plastico">
+              <div class="bin-name">🥤 Plástico <span class="bin-badge on">En línea</span></div>
+              <div class="bin-pct" id="bin-plastico-pct">—%</div>
+              <div class="bin-bar"><span id="bin-plastico-bar"></span></div>
+              <div class="bin-meta" id="bin-plastico-meta">HC + LCD + báscula</div>
+            </div>
+            <div class="bin-card" id="bin-rechazo">
+              <div class="bin-name">🚫 Rechazo <span class="bin-badge on">En línea</span></div>
+              <div class="bin-pct" id="bin-rechazo-pct">—%</div>
+              <div class="bin-bar"><span id="bin-rechazo-bar"></span></div>
+              <div class="bin-meta" id="bin-rechazo-meta">HC conectado · sin LCD</div>
+            </div>
+            <div class="bin-card off" id="bin-aluminio">
+              <div class="bin-name">🥫 Aluminio <span class="bin-badge off">Desconectado</span></div>
+              <div class="bin-pct" id="bin-aluminio-pct">—</div>
+              <div class="bin-bar"><span id="bin-aluminio-bar"></span></div>
+              <div class="bin-meta" id="bin-aluminio-meta">Sensor no cableado</div>
+            </div>
+            <div class="bin-card off" id="bin-vidrio">
+              <div class="bin-name">🍾 Vidrio <span class="bin-badge off">Desconectado</span></div>
+              <div class="bin-pct" id="bin-vidrio-pct">—</div>
+              <div class="bin-bar"><span id="bin-vidrio-bar"></span></div>
+              <div class="bin-meta" id="bin-vidrio-meta">Sensor no cableado</div>
+            </div>
+          </div>
+          <p class="vision-hint" style="margin-top:12px;" id="bins-status">
+            Conexiones: <span class="mono">costa_rica/arduino_bins/README.md</span> · RFID Arduino: <span class="mono">arduino_rfid/</span>
+          </p>
+        </div>
+
         <div class="btn-row">
           <button class="btn btn-outline" id="btn-real-listen" type="button">Escuchar estación real</button>
           <button class="btn btn-primary" id="btn-real-hmi" type="button">Abrir HMI (modo real)</button>
@@ -1995,7 +2088,10 @@ function showAppView(viewName){
   $("app-shell")?.classList.toggle("hmi-mode", viewName === "hmi");
   if(viewName !== "hmi") exitHmiFullscreen();
   if(viewName === "hmi") ensureHmiListen();
-  if(viewName === "plc-real") updateRealBridgeCmd();
+  if(viewName === "plc-real"){
+    updateRealBridgeCmd();
+    ensureBinsListen();
+  }
   if(viewName === "vision") initVisionPanel();
 }
 
@@ -3151,6 +3247,112 @@ function renderRealPanel(data){
   if($("real-alarma")) $("real-alarma").textContent = plc.alarma ? "ACTIVA" : "OK";
   if($("real-emergencia")) $("real-emergencia").textContent = plc.emergencia ? "ACTIVA" : "OK";
   updateTripleMachineStage("real", plc);
+}
+
+/* -------------------------------------------------------------------------
+   BOTES HC-SR04 — bins_pi/estado (Arduino → Pi :8082 → Firestore)
+   ------------------------------------------------------------------------- */
+const BINS_ESTADO = () => doc(db, "bins_pi", "estado");
+let binsUnsub = null;
+
+function paintBin(key, data, opts){
+  const o = opts || {};
+  const card = $("bin-" + key);
+  const pctEl = $("bin-" + key + "-pct");
+  const bar = $("bin-" + key + "-bar");
+  const meta = $("bin-" + key + "-meta");
+  if(o.offline){
+    card?.classList.add("off");
+    card?.classList.remove("lleno","rechazo");
+    if(pctEl) pctEl.textContent = "—";
+    if(bar) bar.style.width = "0%";
+    if(meta) meta.textContent = "Desconectado";
+    return;
+  }
+  const d = data || {};
+  const pct = Math.max(0, Math.min(100, Number(d.pct) || 0));
+  const lleno = !!d.lleno;
+  card?.classList.remove("off");
+  card?.classList.toggle("lleno", lleno);
+  card?.classList.toggle("rechazo", !!(lleno && o.isRechazo));
+  if(pctEl) pctEl.textContent = pct + "%";
+  if(bar) bar.style.width = pct + "%";
+  if(meta){
+    const cm = d.cm;
+    meta.textContent = lleno
+      ? ("LLENO" + (cm != null && cm >= 0 ? ` · ${Number(cm).toFixed(1)} cm` : ""))
+      : (cm != null && cm >= 0 ? `${Number(cm).toFixed(1)} cm` : "Sin eco / sin datos");
+  }
+}
+
+function renderBinsPanel(raw){
+  const lamp = $("bins-lamp");
+  const lampTxt = $("bins-lamp-text");
+  const st = $("bins-status");
+  // Demo: plástico + rechazo en línea; aluminio/vidrio desconectados
+  paintBin("aluminio", null, { offline: true });
+  paintBin("vidrio", null, { offline: true });
+
+  if(!raw){
+    lamp?.classList.remove("green","yellow","red");
+    lamp?.classList.add("green");
+    if(lampTxt) lampTxt.textContent = "Sin datos — ¿ESP32 + sibu-bins?";
+    paintBin("plastico", null, { offline: false });
+    paintBin("rechazo", null, { offline: false });
+    if($("bin-plastico-meta")) $("bin-plastico-meta").textContent = "Esperando telemetría…";
+    if($("bin-rechazo-meta")) $("bin-rechazo-meta").textContent = "Esperando telemetría…";
+    if($("bins-peso")) $("bins-peso").textContent = "— kg";
+    if(st) st.textContent = "Firestore bins_pi/estado vacío";
+    return;
+  }
+  const p = raw.plastico || {};
+  const r = raw.rechazo || {};
+  const llenoP = !!p.lleno;
+  const llenoR = !!r.lleno;
+  lamp?.classList.remove("green","yellow","red");
+  let color = "green";
+  let msg = "Plástico + rechazo en línea · A/V desconectados";
+  if(llenoR){
+    color = "red";
+    msg = "STOP · bote de rechazo LLENO";
+  } else if(llenoP){
+    color = "yellow";
+    msg = "Plástico LLENO · desvío a rechazo";
+  }
+  lamp?.classList.add(color);
+  if(lampTxt) lampTxt.textContent = msg;
+  paintBin("plastico", p, { offline: false });
+  paintBin("rechazo", r, { offline: false, isRechazo: true });
+  if($("bin-rechazo-meta") && !llenoR){
+    const cm = r.cm;
+    const base = (cm != null && cm >= 0) ? `${Number(cm).toFixed(1)} cm` : ($("bin-rechazo-meta").textContent || "");
+    if(!$("bin-rechazo-meta").textContent.includes("LCD")){
+      $("bin-rechazo-meta").textContent = (base || "HC ok") + " · sin LCD";
+    }
+  }
+  const pesoEl = $("bins-peso");
+  if(pesoEl){
+    const kg = raw.pesoKg;
+    pesoEl.textContent = (typeof kg === "number" && !Number.isNaN(kg))
+      ? (kg.toFixed(3) + " kg")
+      : "— kg";
+  }
+  if(st){
+    st.textContent = raw.online
+      ? ("P + rechazo en vivo · " + (raw.atMs ? new Date(raw.atMs).toLocaleTimeString() : ""))
+      : "Último frame recibido";
+  }
+}
+
+function ensureBinsListen(){
+  if(binsUnsub) return;
+  binsUnsub = onSnapshot(BINS_ESTADO(), (snap) => {
+    renderBinsPanel(snap.exists() ? snap.data() : null);
+  }, (err) => {
+    console.error(err);
+    const st = $("bins-status");
+    if(st) st.textContent = "Firestore bins: " + (err.message || err);
+  });
 }
 
 function ensureRealListen(){

@@ -1,15 +1,20 @@
 # Costa Rica — Visión Gemini + Raspberry Pi 4
 
-## RFID (HMI / cámara) — por cuenta Google
+## RFID + botes (Costa Rica)
 
-Ver `costa_rica/esp32_rfid/README.md`.
+```
+Arduino Uno + RC522 --USB Serial--> Pi sibu-rfid-gate  → Firestore unlock
+ESP32 + 2×HC + LCD + HX711 --WiFi--> Pi sibu-bins :8082 → bins_pi/estado
+```
+
+- RFID: `costa_rica/arduino_rfid/`
+- Botes/báscula demo: `costa_rica/arduino_bins/`
 
 ```bash
-# allowlist: CARDUID:Nombre  (luego Vincular en la web)
-# o: CARDUID:Nombre:FIREBASE_AUTH_UID
-bash costa_rica/install_services.sh web   # incluye sibu-rfid-gate
-# Desplegar rules: firebase deploy --only firestore:rules
+# sibu.env: RFID_SERIAL=/dev/ttyUSB0   BINS_PORT=8082
+bash costa_rica/install_services.sh web
 ```
+
 
 ## Página SIBU 📷 (recomendado — cualquier red)
 
@@ -49,7 +54,8 @@ match /vision_pi/{doc} {
 
 | Comando | Qué |
 |---|---|
-| `bash costa_rica/install_services.sh web` | visión Firestore (página) |
+| `bash costa_rica/install_services.sh web` | visión Firestore + RFID + **bins** |
+| `bash costa_rica/install_services.sh bins` | solo niveles HC-SR04 :8082 |
 | `bash costa_rica/install_services.sh http` | opcional :8080 LAN |
 | `bash costa_rica/install_services.sh all` | web + bridge + vision→PLC |
 | `bash costa_rica/install_services.sh stop` | apaga todo |

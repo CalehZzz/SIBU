@@ -1,4 +1,4 @@
-# Networks LAD — PLC real · Gemini + 3 sensores (IA manda) · **sin espera de peso**
+# Networks LAD — PLC real · Gemini + botes HC-SR04 · **sin espera de peso**
 
 ## Lógica física (actual)
 
@@ -8,41 +8,41 @@
        ▼  VisionMaterial listo (1/2/3/4) mientras la pieza avanza
 [Banda sigue]
        │
-       ├─ Vision=1 (plástico) → espera SOLO I_SensorPlastico → PARA → P1
-       ├─ Vision=2 (lata)     → espera SOLO I_SensorAluminio → PARA → P2
-       ├─ Vision=3 (vidrio)   → espera SOLO I_SensorVidrio   → PARA → P3
-       └─ Vision=4 (desconocido) → pass-through sin pistón
-                                    → al FINAL de la banda: báscula DEMO
-                                      (solo representación; poca importancia)
+       ├─ Vision=1 + bote plástico OK     → I_SensorPlastico → PARA → P1 → contador físico
+       ├─ Vision=1 + bote plástico LLENO  → desvío a RECHAZO (como Vision=4) · lámpara AMARILLA
+       ├─ Vision=2 + bote latas OK/LLENO  → igual (P2 o desvío)
+       ├─ Vision=3 + bote vidrio OK/LLENO → igual (P3 o desvío)
+       ├─ Vision=4 (desconocido)          → pass-through → rechazo
+       └─ Bote RECHAZO LLENO              → lámpara ROJA · STOP TOTAL (banda off, sin clasificar)
 ```
 
 **Reglas:**
-1. Gemini decide el material (`VisionMaterial`). Los sensores **no clasifican**.
-2. **No hay paro para pesar.** La báscula **no** condiciona el ciclo de clasificación.
-3. Pueden activarse varios sensores a la vez: **se ignoran** si no son el de la vía pedida por la IA.
-4. La banda **solo** para por: (a) sensor de la vía del material detectado + pistón, (b) stop/alarma/emergencia.
-5. `desconocido` (4) o timeout → **dejar pasar**, sin pistón. La báscula al final es cosmético / demo.
+1. Gemini decide el material (`VisionMaterial`). Los sensores de vía **no clasifican**.
+2. **No hay paro para pesar.**
+3. **Botes (Arduino HC-SR04):** si un material está lleno → **amarillo** y ese material va a rechazo; los otros 2 siguen.
+4. Si el bote de **rechazo** está lleno → **rojo** y se **detiene todo**.
+5. Contadores de mesa = pulsos `Q_Cont*` al clasificar (no al desviar).
 
-| Pistón | Ext/Ret | Sensor físico | Qué detecta el hardware | VisionMaterial |
-|---|---|---|---|---|
-| P1 plástico | Ext/Ret | `I_SensorPlastico` | Óptico “detecta todo” (vía P1) | **1** |
-| P2 latas | Ext/Ret | `I_SensorAluminio` | Sensor **metal** | **2** |
-| P3 vidrio | Ext/Ret | `I_SensorVidrio` | Sensor **vidrio** | **3** |
-| — | — | — | — | **4** = desconocido (pass-through) |
-| — | — | — | — | **0** = vacío / pendiente |
+| Pistón | Sensor vía | Vision | Si bote material lleno |
+|---|---|---|---|
+| P1 | `I_SensorPlastico` | 1 | Desvío rechazo · no P1 · no contador P |
+| P2 | `I_SensorAluminio` | 2 | Desvío rechazo · no P2 |
+| P3 | `I_SensorVidrio` | 3 | Desvío rechazo · no P3 |
+| — | — | 4 | Siempre rechazo |
 
-Tags:
-- `I_SensorPieza` — óptico de **entrada** (trigger cámara; **no** para la banda por peso)
-- `I_BasculaFinal` (`%I0.4`) — báscula al **final** (vía desconocidos / demo). **Opcional**, no gatea lógica
-- `DB_HMI.PesoActualKg` — solo si querés mostrar un número en la web (demo)
+Señales de bote (Arduino → PLC DI o Merker vía bridge):
+- `I_BinFullPlastico` / `Aluminio` / `Vidrio` / `Rechazo`
 
 Memorias:
-- `M_EsperandoVision` — pieza detectada, aún `VisionMaterial==0` (banda **sigue**)
-- `M_ClasifPlastico/Aluminio/Vidrio` — ciclo pistón
-- `M_Clasificando` — OR de clasif (para banda en empuje)
-- `M_PassThrough` — visión=4
+- `M_EsperandoVision` · `M_Clasif*` · `M_Clasificando`
+- `M_DivertPlastico` := BinFullP AND NOT BinFullRechazo (idem A/V)
+- `M_PassThrough` := Vision=4 OR DivertP OR DivertA OR DivertV
+- `M_StopBotes` := BinFullRechazo → fuerza alarma/stop
 
-> ~~`M_Pesando`~~ ya **no** se usa como paro por báscula. Si lo tenías, renombralo a `M_EsperandoVision` y **sacalo** de la red de banda.
+Lámparas:
+- `Q_LamparaRun` (verde) — sistema OK
+- `Q_LamparaAmarilla` — algún bote P/A/V lleno (modo desvío)
+- `Q_LamparaAlarma` (roja) — rechazo lleno **o** emergencia
 
 ---
 
@@ -52,161 +52,107 @@ Memorias:
 ---
 
 ## FC_Modos
-Start/Stop/Emergencia → `M_SistemaOn` · `ModoAuto` · lámparas.
+
+```
+Q_LamparaAlarma (roja) := Emergencia OR M_Alarma OR I_BinFullRechazo;
+Q_LamparaAmarilla      := NOT I_BinFullRechazo AND (I_BinFullPlastico OR I_BinFullAluminio OR I_BinFullVidrio);
+Q_LamparaRun (verde)   := M_SistemaOn AND NOT Q_LamparaAlarma AND NOT Q_LamparaAmarilla;
+```
+
+`M_StopBotes` := `I_BinFullRechazo`
 
 ---
 
 ## FC_Secuencia
 
-### NW1 — Entrada → `(S) M_EsperandoVision` (banda **no** para)
-
-Flanco de pieza a la entrada (`I_SensorPieza`):
+### NW1 — Entrada → `(S) M_EsperandoVision`
 
 ```
----| M_SistemaOn |---| M_ModoAuto |---|/ Emergencia |---|/ M_Alarma |
+---| M_SistemaOn |---| M_ModoAuto |---|/ Emergencia |---|/ M_Alarma |---|/ M_StopBotes |
 ---| I_SensorPieza |---|/ M_EsperandoVision |---|/ M_Clasificando |
 ---| VisionMaterial == 0 |----(P) → (S) M_EsperandoVision
 ```
 
-> La Pi ve flanco `I_SensorPieza` / `M_EsperandoVision` y toma foto + Gemini **con la banda en marcha**.
-
----
-
-### NW2 — Banda AUTO // MANUAL → `Q_Banda`
+### NW2 — Banda → `Q_Banda`
 
 ```
-AUTO: On · Auto · /Emerg · /Alarma · /M_Clasificando ─┐
-                                                      ├──( ) Q_Banda
-MANUAL: On · /Auto · ManualBanda ─────────────────────┘
+AUTO: On · Auto · /Emerg · /Alarma · /M_StopBotes · /M_Clasificando ─┐
+                                                                     ├──( ) Q_Banda
+MANUAL: On · /Auto · ManualBanda · /M_StopBotes ─────────────────────┘
 ```
-
-**Solo** `M_Clasificando` (empuje) corta la banda.  
-**No** uses báscula ni `M_EsperandoVision` para cortar.
-
----
 
 ### NW3 — Visión lista → `(R) M_EsperandoVision`
-
-Cuando Gemini escribió **1..4** (o timeout → 4):
 
 ```
 ---| M_EsperandoVision |---| VisionMaterial <> 0 |----(R) M_EsperandoVision
 ```
 
-**No** esperar `I_BasculaLista` / peso.
+### NW3b — Flags de desvío
 
----
+```scl
+M_DivertPlastico := I_BinFullPlastico AND NOT I_BinFullRechazo;
+M_DivertAluminio := I_BinFullAluminio AND NOT I_BinFullRechazo;
+M_DivertVidrio   := I_BinFullVidrio   AND NOT I_BinFullRechazo;
+M_PassThrough    := (VisionMaterial = 4)
+                 OR (VisionMaterial = 1 AND M_DivertPlastico)
+                 OR (VisionMaterial = 2 AND M_DivertAluminio)
+                 OR (VisionMaterial = 3 AND M_DivertVidrio);
+```
 
-### NW4 — Latch plástico (solo si IA dijo 1)
+### NW4 — Latch plástico (IA=1 y bote P OK)
 
 ```
----| On |---| Auto |---|/ Emerg |---|/ Alarma |
+---| On |---| Auto |---|/ Emerg |---|/ Alarma |---|/ M_StopBotes |---|/ M_DivertPlastico |
 ---| VisionMaterial == 1 |---| I_SensorPlastico |
 ---|/ ClasifAluminio |---|/ ClasifVidrio |----(S) M_ClasifPlastico
 ```
 
----
-
-### NW5 — Latch latas (solo si IA dijo 2)
+### NW5 — Latch latas (IA=2 y no divert)
 
 ```
----| On |---| Auto |---|/ Emerg |---|/ Alarma |
+---| On |---| Auto |---|/ Emerg |---|/ Alarma |---|/ M_StopBotes |---|/ M_DivertAluminio |
 ---| VisionMaterial == 2 |---| I_SensorAluminio |
 ---|/ ClasifPlastico |---|/ ClasifVidrio |----(S) M_ClasifAluminio
 ```
 
----
-
-### NW6 — Latch vidrio (solo si IA dijo 3)
+### NW6 — Latch vidrio (IA=3 y no divert)
 
 ```
----| On |---| Auto |---|/ Emerg |---|/ Alarma |
+---| On |---| Auto |---|/ Emerg |---|/ Alarma |---|/ M_StopBotes |---|/ M_DivertVidrio |
 ---| VisionMaterial == 3 |---| I_SensorVidrio |
 ---|/ ClasifPlastico |---|/ ClasifAluminio |----(S) M_ClasifVidrio
 ```
 
----
-
-### NW7 — `M_Clasificando` + pass-through
+### NW7 — `M_Clasificando`
 
 ```scl
 M_Clasificando := M_ClasifPlastico OR M_ClasifAluminio OR M_ClasifVidrio;
-M_PassThrough  := (DB_HMI.VisionMaterial = 4);
 ```
 
----
-
-### NW8 — Desconocido: limpiar al llegar al final
-
-Óptico final de vía o sensor de salida (ej. el mismo “detecta todo” al final, o un `I_SalidaFinal` si lo cableás):
+### NW8 — Pass-through / desvío: limpiar Vision al final
 
 ```
----| VisionMaterial == 4 |---| I_SensorPlastico |---- MOVE 0 → VisionMaterial
+---| M_PassThrough |---| I_SensorPlastico |---- MOVE 0 → VisionMaterial
 ```
 
-(Sin pistón. Contador “rechazo” opcional.)
+### NW8b — Báscula DEMO al final (opcional)
 
----
-
-### NW8b — Báscula DEMO al final (opcional · poca importancia)
-
-Solo representación: cuando un desconocido (o cualquier pieza que llegó al final) activa la báscula:
-
-```
----| I_BasculaFinal |---- // opcional: copiar peso a DatosEstacion.PesoActualKg
-                         // NO (R)/(S) de clasificación
-                         // NO cortar banda por esto
-```
-
-Podés **omitir** esta red en la demo si no cableás báscula.
-
----
-
-### NW9–11 — Comando pistón + Ext/Ret
-`M_PistonN` ← ClasifX // Manual; interlock Ext/Ret (nunca ambos a 1).
-
-### NW12–14 — TON empuje → **contador FÍSICO** + Vision:=0
-
-Al terminar el empuje (flanco `T_EmpujePistonN.Q`), **no alcanza** con sumar un Int en el DB:
-
-1. Pulso a la salida del contador mecánico / electrónico que te den en mesa  
-2. (Opcional) `ADD 1` en `DatosEstacion.Cont*` solo para espejo web  
-3. `VisionMaterial := 0` · `(R) M_Clasif…`
-
-```
----|(P) T_EmpujePiston1.Q |----( ) Q_ContPlastico     // pulso contador FÍSICO P1
----|(P) T_EmpujePiston1.Q |---- ADD 1 → ContPlastico  // espejo web (opcional)
----|(P) T_EmpujePiston1.Q |---- MOVE 0 → VisionMaterial
----|(P) T_EmpujePiston1.Q |----(R) M_ClasifPlastico
-```
-
-Igual para P2 → `Q_ContAluminio` / `ContAluminio` · P3 → `Q_ContVidrio` / `ContVidrio`.
-
-**Pulso:** TON corto `T_PulsoCont` PT:=T#100ms (o lo que pida el contador) manteniendo `Q_Cont*` en 1.  
-Muchos contadores 24 V cuentan en flanco; no dejes la salida pegada en 1.
-
-> La fuente de verdad en la demo física es el **contador de mesa**. El Int del DB es solo para la web.
+### NW9–11 — Pistón Ext/Ret
+### NW12–14 — TON → pulso contador FÍSICO + Vision:=0 (solo clasif real)
 
 ---
 
 ## FC_Alarmas
 
-### Timeout: entrada sin visión
-```
----| M_EsperandoVision |----[ TON T_TimeoutVision  PT:=T#8s ]
----| T_TimeoutVision.Q |---- MOVE 4 → VisionMaterial   // pass-through
----| T_TimeoutVision.Q |----(R) M_EsperandoVision
-```
-(Opcional: alarma suave; no hace falta parar la planta.)
+Timeout visión/vía como antes.
 
-### Timeout: visión 1/2/3 sin sensor de vía
+### Rechazo lleno
 ```
----| VisionMaterial >= 1 |---| VisionMaterial <= 3 |---|/ M_Clasificando |
-----[ TON T_TimeoutVia  PT:=T#8s ]
----| T_TimeoutVia.Q |---- MOVE 0 → VisionMaterial   // deja pasar
+---| I_BinFullRechazo |----(S) M_Alarma
+---| I_BinFullRechazo |----(R) M_EsperandoVision
+---| I_BinFullRechazo |----(R) Clasif*
+---| I_BinFullRechazo |---- MOVE 0 → VisionMaterial
 ```
-
-Emergencia: `(R) M_EsperandoVision` + `(R) Clasif*` + `VisionMaterial := 0`.
 
 ---
 
@@ -214,18 +160,13 @@ Emergencia: `(R) M_EsperandoVision` + `(R) Clasif*` + `VisionMaterial := 0`.
 
 | Campo | Quién |
 |---|---|
-| `VisionMaterial` 1/2/3/4 | Pi (`vision_gemini.py` / classify) |
-| `VisionMaterial := 0` | PLC al terminar empuje, pass-through, timeout o emergencia |
-| `M_EsperandoVision` | PLC (entrada pieza) — **no para banda** |
-| Foto | Pi en flanco `I_SensorPieza` / `M_EsperandoVision` |
-| **Conteo** | **Contador FÍSICO** (`Q_Cont*` pulso). DB `Cont*` = espejo web opcional |
-| Peso | Opcional demo vía `I_BasculaFinal` → web; **no** gatea |
+| `VisionMaterial` | Pi Gemini |
+| Bin full DI | Arduino HC-SR04 |
+| Contadores mesa | `Q_Cont*` pulso |
+| Panel web % | Firestore `bins_pi/estado` |
 
----
+## Checklist demo
 
-## Checklist mental demo
-
-1. Pieza entra → **banda sigue** → foto Gemini en marcha  
-2. Gemini=lata → metal ON → **solo** metal para + P2  
-3. Gemini=desconocido → pasa al final → báscula demo (si está) · sin pistón  
-4. **Nunca** esperás “peso listo” para clasificar  
+1. Plástico OK → P1 + contador físico  
+2. Plástico lleno · latas OK → amarillo · plástico a rechazo · latas a P2  
+3. Rechazo lleno → rojo · todo parado  

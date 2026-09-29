@@ -11,9 +11,10 @@
 - [ ] Tag table según `TABLA_IO_1214C.md` (**5 DI** + **10 DQ**)
   - `I_SensorPieza` = entrada (foto); **no** paro por peso
   - `I_BasculaFinal` (`I0.4`) = báscula al **final** (demo); **no** gatea
-- [ ] **3 contadores FÍSICOS** (los que den en mesa) cableados a `Q_ContPlastico/Aluminio/Vidrio`
-  - Si la CPU solo tiene 10 DQ → módulo SM1222 u otra expansión DO
-  - Al fin de cada empuje: **1 pulso ~100 ms** (no solo `ADD` en el DB)
+- [ ] **4× HC-SR04** (Arduino) → botes P/A/V/Rechazo · ver `costa_rica/arduino_bins/`
+- [ ] DI `I_BinFull*` cableadas (o Merker desde `bins_pi`)
+- [ ] Lámpara amarilla = material lleno (desvío) · roja = rechazo lleno (stop)
+- [ ] **3 contadores FÍSICOS** cableados a `Q_ContPlastico/Aluminio/Vidrio`
 - [ ] LAD según `NETWORKS_LAD.md`:
   - banda **sigue** tras entrada; solo para en clasif/pistón
   - latch = **VisionMaterial == N AND I_Sensor…**

@@ -70,6 +70,8 @@ def main() -> None:
     p.add_argument("--port", type=int, default=int(os.environ.get("RFID_PORT", "8081")))
     p.add_argument("--service-account", default=str(ROOT / "serviceAccountKey.json"))
     p.add_argument("--ttl", type=int, default=int(os.environ.get("RFID_TTL_SEC", "300")))
+    p.add_argument("--serial", default=os.environ.get("RFID_SERIAL", "") or "")
+    p.add_argument("--baud", type=int, default=int(os.environ.get("RFID_BAUD", "115200")))
     args = p.parse_args()
 
     sa = Path(args.service_account)
@@ -82,6 +84,8 @@ def main() -> None:
     fs = firestore.client()
     allow = load_allow()
     print(f"RFID allow file/env: {len(allow)} → {list(allow.keys())}")
+    if args.serial:
+        print(f"RFID Serial: {args.serial} @{args.baud} (Arduino USB)")
     sys.stdout.flush()
 
     def publish_scan(**fields) -> None:
@@ -147,10 +151,7 @@ def main() -> None:
         return payload
 
     def try_pending_link(card: str) -> tuple[dict | None, str | None]:
-        """
-        Vincula tarjeta a la cuenta con pedido vigente.
-        Retorna (payload_unlock | None, error | None).
-        """
+        """Vincula tarjeta a la cuenta con pedido vigente."""
         now = int(time.time() * 1000)
         best = None
         best_exp = 0
@@ -182,7 +183,6 @@ def main() -> None:
         ref, auth_uid, nombre, email = best
         c = norm_uid(card)
 
-        # Exclusivo: si ya es de otra cuenta, no se puede robar
         existing = card_binding(c)
         if existing and existing["authUid"] != auth_uid:
             err = (
@@ -236,6 +236,119 @@ def main() -> None:
         print(f"LINK card={c} → authUid={auth_uid} email={email}")
         return unlock_account(auth_uid, nombre, c, email), None
 
+    def process_card(card_raw: str) -> dict:
+        """Misma lógica para HTTP y Serial Arduino. Retorna dict con ok/code/..."""
+        card = norm_uid(card_raw)
+        if not card:
+            return {"ok": False, "code": 400, "error": "falta uid"}
+
+        linked = None
+        link_err = None
+        try:
+            linked, link_err = try_pending_link(card)
+        except Exception as e:
+            print(f"⚠️  link: {e}")
+            link_err = str(e)
+
+        if linked:
+            publish_scan(
+                ok=True,
+                linked=True,
+                cardUid=linked.get("cardUid") or card,
+                authUid=linked.get("authUid"),
+                email=linked.get("email") or "",
+                nombre=linked.get("nombre") or "",
+                error=None,
+            )
+            return {
+                "ok": True,
+                "code": 200,
+                "linked": True,
+                "nombre": linked.get("nombre"),
+                "email": linked.get("email"),
+                "authUid": linked.get("authUid"),
+                "cardUid": linked.get("cardUid"),
+                "untilMs": linked.get("untilMs"),
+                "ttlSec": args.ttl,
+            }
+
+        if link_err:
+            publish_scan(ok=False, linked=False, cardUid=card, error=link_err)
+            return {"ok": False, "code": 403, "error": link_err, "uid": card}
+
+        info = lookup_card(card)
+        if not info:
+            err = "tarjeta desconocida — tocá Vincular mi tarjeta en la app"
+            print(f"DENY unknown card={card}")
+            publish_scan(ok=False, cardUid=card, error=err)
+            return {"ok": False, "code": 403, "error": err, "uid": card}
+
+        if not info.get("authUid"):
+            err = "tarjeta sin cuenta — tocá Vincular mi tarjeta (90 s) y acercá de nuevo"
+            print(f"DENY card={info['cardUid']} sin cuenta vinculada")
+            publish_scan(ok=False, cardUid=info["cardUid"], error=err, needsLink=True)
+            return {"ok": False, "code": 403, "error": err, "uid": info["cardUid"]}
+
+        payload = unlock_account(
+            info["authUid"], info["nombre"], info["cardUid"], info.get("email") or ""
+        )
+        print(f"ALLOW {info['nombre']} card={info['cardUid']} user={info['authUid']}")
+        publish_scan(
+            ok=True,
+            linked=False,
+            cardUid=info["cardUid"],
+            authUid=info["authUid"],
+            email=info.get("email") or "",
+            nombre=info["nombre"],
+            error=None,
+        )
+        return {
+            "ok": True,
+            "code": 200,
+            "nombre": info["nombre"],
+            "email": info.get("email") or "",
+            "authUid": info["authUid"],
+            "cardUid": info["cardUid"],
+            "untilMs": payload["untilMs"],
+            "ttlSec": args.ttl,
+        }
+
+    if args.serial:
+        import threading
+
+        def serial_loop() -> None:
+            try:
+                import serial  # type: ignore
+            except ImportError:
+                print("⚠️  pyserial no instalado — pip install pyserial")
+                return
+            while True:
+                try:
+                    ser = serial.Serial(args.serial, args.baud, timeout=1)
+                    print(f"✅ RFID Serial abierto {args.serial}")
+                    while True:
+                        line = ser.readline().decode("utf-8", errors="ignore").strip()
+                        if not line:
+                            continue
+                        uid = ""
+                        if line.startswith("{"):
+                            try:
+                                uid = str(json.loads(line).get("uid") or "")
+                            except Exception:
+                                continue
+                        else:
+                            # hex suelto
+                            uid = line
+                        if not uid or uid.lower() in ("ok", "true"):
+                            continue
+                        result = process_card(uid)
+                        print(f"SER RFID → {result.get('code')} ok={result.get('ok')} {result.get('error') or result.get('cardUid') or ''}")
+                except Exception as e:
+                    print(f"⚠️  serial RFID: {e} — reintento 3s")
+                    time.sleep(3)
+
+        threading.Thread(target=serial_loop, daemon=True).start()
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt: str, *a) -> None:
             sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % a))
@@ -261,7 +374,16 @@ def main() -> None:
 
         def do_GET(self) -> None:
             if urlparse(self.path).path == "/api/health":
-                self._json(200, {"ok": True, "perAccount": True, "exclusive": True, "ttl": args.ttl})
+                self._json(
+                    200,
+                    {
+                        "ok": True,
+                        "perAccount": True,
+                        "exclusive": True,
+                        "ttl": args.ttl,
+                        "serial": bool(args.serial),
+                    },
+                )
                 return
             self._json(404, {"ok": False})
 
@@ -275,90 +397,9 @@ def main() -> None:
                 return
 
             if path == "/api/rfid":
-                card = norm_uid(data.get("uid") or "")
-                if not card:
-                    self._json(400, {"ok": False, "error": "falta uid"})
-                    return
-
-                # 1) vincular pendiente
-                linked = None
-                link_err = None
-                try:
-                    linked, link_err = try_pending_link(card)
-                except Exception as e:
-                    print(f"⚠️  link: {e}")
-                    link_err = str(e)
-
-                if linked:
-                    publish_scan(
-                        ok=True,
-                        linked=True,
-                        cardUid=linked.get("cardUid") or card,
-                        authUid=linked.get("authUid"),
-                        email=linked.get("email") or "",
-                        nombre=linked.get("nombre") or "",
-                        error=None,
-                    )
-                    self._json(
-                        200,
-                        {
-                            "ok": True,
-                            "linked": True,
-                            "nombre": linked.get("nombre"),
-                            "email": linked.get("email"),
-                            "authUid": linked.get("authUid"),
-                            "cardUid": linked.get("cardUid"),
-                            "untilMs": linked.get("untilMs"),
-                            "ttlSec": args.ttl,
-                        },
-                    )
-                    return
-
-                if link_err:
-                    publish_scan(ok=False, linked=False, cardUid=card, error=link_err)
-                    self._json(403, {"ok": False, "error": link_err, "uid": card})
-                    return
-
-                info = lookup_card(card)
-                if not info:
-                    err = "tarjeta desconocida — tocá Vincular mi tarjeta en la app"
-                    print(f"DENY unknown card={card}")
-                    publish_scan(ok=False, cardUid=card, error=err)
-                    self._json(403, {"ok": False, "error": err, "uid": card})
-                    return
-
-                if not info.get("authUid"):
-                    err = "tarjeta sin cuenta — tocá Vincular mi tarjeta (90 s) y acercá de nuevo"
-                    print(f"DENY card={info['cardUid']} sin cuenta vinculada")
-                    publish_scan(ok=False, cardUid=info["cardUid"], error=err, needsLink=True)
-                    self._json(403, {"ok": False, "error": err, "uid": info["cardUid"]})
-                    return
-
-                payload = unlock_account(
-                    info["authUid"], info["nombre"], info["cardUid"], info.get("email") or ""
-                )
-                print(f"ALLOW {info['nombre']} card={info['cardUid']} user={info['authUid']}")
-                publish_scan(
-                    ok=True,
-                    linked=False,
-                    cardUid=info["cardUid"],
-                    authUid=info["authUid"],
-                    email=info.get("email") or "",
-                    nombre=info["nombre"],
-                    error=None,
-                )
-                self._json(
-                    200,
-                    {
-                        "ok": True,
-                        "nombre": info["nombre"],
-                        "email": info.get("email") or "",
-                        "authUid": info["authUid"],
-                        "cardUid": info["cardUid"],
-                        "untilMs": payload["untilMs"],
-                        "ttlSec": args.ttl,
-                    },
-                )
+                result = process_card(data.get("uid") or "")
+                code = int(result.pop("code", 200))
+                self._json(code, result)
                 return
 
             if path == "/api/lock":
@@ -381,7 +422,7 @@ def main() -> None:
             self._json(404, {"ok": False})
 
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
-    print(f"✅ RFID gate (por cuenta, exclusivo) :{args.port}")
+    print(f"✅ RFID gate (Arduino Serial y/o HTTP) :{args.port}")
     sys.stdout.flush()
     try:
         httpd.serve_forever()
