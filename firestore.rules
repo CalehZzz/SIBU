@@ -45,14 +45,19 @@ service cloud.firestore {
       allow read, write: if signedIn();
     }
 
-    // RFID: lectura para la web; escritura también auth
-    // (la Pi usa Admin SDK y bypasea rules; el cliente puede bloquear)
-    match /rfid_gate/{doc} {
-      allow read, write: if signedIn();
+    // RFID por cuenta: doc id = Firebase Auth uid del operador
+    // (la Pi usa Admin SDK y bypasea rules; el cliente solo toca SU doc)
+    match /rfid_gate/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
     }
 
-    match /rfid_tarjetas/{uid} {
-      allow read: if signedIn();
+    // Pedido de vincular tarjeta → cuenta (90s). Doc id = auth uid.
+    match /rfid_link_pending/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /rfid_tarjetas/{cardUid} {
+      allow read: if signedIn() && resource.data.authUid == request.auth.uid;
       allow write: if isAdmin();
     }
   }

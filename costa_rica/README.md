@@ -1,13 +1,14 @@
 # Costa Rica — Visión Gemini + Raspberry Pi 4
 
-## RFID (HMI / cámara)
+## RFID (HMI / cámara) — por cuenta Google
 
 Ver `costa_rica/esp32_rfid/README.md`.
 
 ```bash
-# en sibu.env: RFID_ALLOW=UIDHEX:Nombre
+# allowlist: CARDUID:Nombre  (luego Vincular en la web)
+# o: CARDUID:Nombre:FIREBASE_AUTH_UID
 bash costa_rica/install_services.sh web   # incluye sibu-rfid-gate
-curl -X POST http://127.0.0.1:8081/api/rfid -H 'Content-Type: application/json' -d '{"uid":"TEST"}'
+# Desplegar rules: firebase deploy --only firestore:rules
 ```
 
 ## Página SIBU 📷 (recomendado — cualquier red)
