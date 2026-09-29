@@ -1780,30 +1780,20 @@
         </div>
 
         <div class="card real-card" id="bins-panel">
-          <div class="section-title">Botes · HC-SR04 (Arduino)</div>
+          <div class="section-title">Botes + báscula · ESP32 (demo)</div>
           <p style="font-size:13px; color:var(--forest-soft); line-height:1.45; margin:0 0 10px;">
-            Si un material está <b>lleno</b> → lámpara <b>amarilla</b> y ese material va a <b>rechazo</b>.
-            Si <b>rechazo</b> está lleno → lámpara <b>roja</b> y se detiene todo.
+            Demo: HC <b>plástico</b> + <b>rechazo</b>, LCD y báscula <b>HX711</b> (plástico).
+            Plástico lleno → <b>amarilla</b> (desvío a rechazo). Rechazo lleno → <b>roja</b> + stop.
+            RFID va por <b>Arduino USB</b> a la Pi.
           </p>
-          <div class="bins-lamp green" id="bins-lamp"><span class="dot"></span><span id="bins-lamp-text">Esperando Arduino…</span></div>
+          <div class="bins-lamp green" id="bins-lamp"><span class="dot"></span><span id="bins-lamp-text">Esperando ESP32…</span></div>
+          <div class="plc-chip" style="margin-top:10px;">Peso plástico (HX711) <b id="bins-peso">— kg</b></div>
           <div class="bins-grid" id="bins-grid">
             <div class="bin-card" id="bin-plastico">
-              <div class="bin-name">🥤 Plástico <span style="font-weight:600;color:var(--forest-soft);">(LCD ejemplo)</span></div>
+              <div class="bin-name">🥤 Plástico <span style="font-weight:600;color:var(--forest-soft);">(LCD + HC)</span></div>
               <div class="bin-pct" id="bin-plastico-pct">—%</div>
               <div class="bin-bar"><span id="bin-plastico-bar"></span></div>
               <div class="bin-meta" id="bin-plastico-meta">Sin datos</div>
-            </div>
-            <div class="bin-card" id="bin-aluminio">
-              <div class="bin-name">🥫 Aluminio</div>
-              <div class="bin-pct" id="bin-aluminio-pct">—%</div>
-              <div class="bin-bar"><span id="bin-aluminio-bar"></span></div>
-              <div class="bin-meta" id="bin-aluminio-meta">Sin datos</div>
-            </div>
-            <div class="bin-card" id="bin-vidrio">
-              <div class="bin-name">🍾 Vidrio</div>
-              <div class="bin-pct" id="bin-vidrio-pct">—%</div>
-              <div class="bin-bar"><span id="bin-vidrio-bar"></span></div>
-              <div class="bin-meta" id="bin-vidrio-meta">Sin datos</div>
             </div>
             <div class="bin-card" id="bin-rechazo">
               <div class="bin-name">🚫 Rechazo</div>
@@ -1811,9 +1801,21 @@
               <div class="bin-bar"><span id="bin-rechazo-bar"></span></div>
               <div class="bin-meta" id="bin-rechazo-meta">Sin datos</div>
             </div>
+            <div class="bin-card" id="bin-aluminio" style="opacity:.45;">
+              <div class="bin-name">🥫 Aluminio</div>
+              <div class="bin-pct" id="bin-aluminio-pct">—</div>
+              <div class="bin-bar"><span id="bin-aluminio-bar"></span></div>
+              <div class="bin-meta" id="bin-aluminio-meta">Próximamente</div>
+            </div>
+            <div class="bin-card" id="bin-vidrio" style="opacity:.45;">
+              <div class="bin-name">🍾 Vidrio</div>
+              <div class="bin-pct" id="bin-vidrio-pct">—</div>
+              <div class="bin-bar"><span id="bin-vidrio-bar"></span></div>
+              <div class="bin-meta" id="bin-vidrio-meta">Próximamente</div>
+            </div>
           </div>
           <p class="vision-hint" style="margin-top:12px;" id="bins-status">
-            Servicio Pi: <span class="mono">sibu-bins</span> · sketch <span class="mono">costa_rica/arduino_bins/</span>
+            ESP32 → <span class="mono">sibu-bins</span> · Arduino RFID → <span class="mono">sibu-rfid-gate</span> (USB)
           </p>
         </div>
 
@@ -3280,9 +3282,16 @@ function renderBinsPanel(raw){
   paintBin("aluminio", raw.aluminio, false);
   paintBin("vidrio", raw.vidrio, false);
   paintBin("rechazo", raw.rechazo, true);
+  const pesoEl = $("bins-peso");
+  if(pesoEl){
+    const kg = raw.pesoKg;
+    pesoEl.textContent = (typeof kg === "number" && !Number.isNaN(kg))
+      ? (kg.toFixed(3) + " kg")
+      : "— kg";
+  }
   if(st){
     st.textContent = raw.online
-      ? ("En vivo · " + (raw.atMs ? new Date(raw.atMs).toLocaleTimeString() : ""))
+      ? ("ESP32 en vivo · " + (raw.atMs ? new Date(raw.atMs).toLocaleTimeString() : ""))
       : "Último frame recibido";
   }
 }

@@ -26,6 +26,7 @@ fi
 grep -q '^RFID_PORT=' "$ROOT/costa_rica/sibu.env" 2>/dev/null || echo 'RFID_PORT=8081' >> "$ROOT/costa_rica/sibu.env"
 grep -q '^RFID_TTL_SEC=' "$ROOT/costa_rica/sibu.env" 2>/dev/null || echo 'RFID_TTL_SEC=300' >> "$ROOT/costa_rica/sibu.env"
 grep -q '^BINS_PORT=' "$ROOT/costa_rica/sibu.env" 2>/dev/null || echo 'BINS_PORT=8082' >> "$ROOT/costa_rica/sibu.env"
+# RFID_SERIAL se configura a mano tras pluggear el Arduino (ttyUSB0 / ttyACM0)
 
 sudo cp "$ROOT/costa_rica/systemd/"*.service /etc/systemd/system/
 sudo systemctl daemon-reload

@@ -62,11 +62,19 @@ def main() -> None:
             }
 
         divert = raw.get("divert") or {}
+        peso = raw.get("pesoKg")
+        try:
+            peso_f = float(peso) if peso is not None else None
+        except (TypeError, ValueError):
+            peso_f = None
         return {
             "plastico": bin_of("plastico"),
             "aluminio": bin_of("aluminio"),
             "vidrio": bin_of("vidrio"),
             "rechazo": bin_of("rechazo"),
+            "pesoKg": peso_f,
+            "pesoMaterial": str(raw.get("pesoMaterial") or "plastico"),
+            "demo": bool(raw.get("demo")),
             "lamp": str(raw.get("lamp") or "green"),
             "stop": bool(raw.get("stop")),
             "divert": {
@@ -115,7 +123,7 @@ def main() -> None:
                 norm = normalize(data)
                 publish(norm)
                 lamp = norm["lamp"]
-                print(f"BINS lamp={lamp} stop={norm['stop']} P={norm['plastico']['pct']}% A={norm['aluminio']['pct']}% V={norm['vidrio']['pct']}% R={norm['rechazo']['pct']}%")
+                print(f"BINS lamp={lamp} stop={norm['stop']} P={norm['plastico']['pct']}% R={norm['rechazo']['pct']}% kg={norm.get('pesoKg')}")
                 self._json(200, {"ok": True})
             except Exception as e:
                 print(f"⚠️  bins: {e}")
