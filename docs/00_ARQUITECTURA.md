@@ -4,12 +4,15 @@
 
 Una **estación automatizada de clasificación y pesaje** de **plástico, latas (aluminio) y vidrio**, con:
 
-| Pieza del reto | Herramienta | Rol |
-|---|---|---|
-| PLC Siemens | **TIA Portal V20** + PLCSIM | Cerebro: arranque/paro, modos, secuencia, contadores, alarmas |
-| Electroneumática | **Automation Studio** | Simula banda, sensores, cilindro (pistón) y electroválvulas |
-| HMI | **WinCC** dentro de TIA Portal | Pantalla industrial: ON/OFF, manual/auto, contadores, alarmas |
-| Innovación | **App web Guacamayos** | Cualquier persona se conecta y ve lo acumulado en vivo |
+| Pieza del reto | Herramienta | Rol | Rúbrica |
+|---|---|---|---|
+| PLC Siemens | **TIA Portal V20** + PLCSIM | Cerebro: arranque/paro, modos, secuencia, contadores, alarmas | **Obligatorio** |
+| Electroneumática | **Automation Studio** | Simula banda, sensores, cilindro (pistón) y electroválvulas | **Obligatorio** |
+| Físico | Mesa + PLC 1214C (I/Q) | Misma lógica en hardware real | **Obligatorio** (integral / campo) |
+| HMI | WinCC **o** HMI web Guacamayos | ON/OFF, manual/auto, contadores, alarmas | **Obligatorio** |
+| **Plus / innovación** | **App web Guacamayos** | Usuario + HMI remota; no sustituye AS ni TIA | **Plus** |
+
+Ver mapa completo: [`12_RUBRICA_CAPAS.md`](12_RUBRICA_CAPAS.md).
 
 ## Flujo físico (3 materiales)
 
