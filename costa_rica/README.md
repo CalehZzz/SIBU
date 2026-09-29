@@ -7,11 +7,13 @@ Arduino Uno + RC522 --USB Serial--> Pi sibu-rfid-gate  → Firestore unlock
 ESP32 + 2×HC + LCD + HX711 --WiFi--> Pi sibu-bins :8082 → bins_pi/estado
 ```
 
+**Probar ahora (sin PLC):** [`PROBAR_ESP_ARDUINO.md`](PROBAR_ESP_ARDUINO.md)
+
 - RFID: `costa_rica/arduino_rfid/`
 - Botes/báscula demo: `costa_rica/arduino_bins/`
 
 ```bash
-# sibu.env: RFID_SERIAL=/dev/ttyUSB0   BINS_PORT=8082
+# sibu.env: RFID_SERIAL=/dev/ttyACM0   BINS_PORT=8082
 bash costa_rica/install_services.sh web
 ```
 
