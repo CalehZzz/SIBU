@@ -212,33 +212,73 @@
   .vision-key-row input{flex:1;}
   .vision-hint{font-size:12.5px; color:var(--forest-soft); line-height:1.45; margin:8px 0 0;}
 
-  /* ---------- Candado RFID ---------- */
+  /* ---------- Candado RFID (por cuenta) ---------- */
   .rfid-lock{
     display:none; position:fixed; inset:0; z-index:80;
-    background:rgba(31,59,45,.55); backdrop-filter:blur(6px);
+    background:rgba(20,36,28,.62); backdrop-filter:blur(8px);
     align-items:center; justify-content:center; padding:20px;
   }
   .rfid-lock.show{display:flex;}
   .rfid-card{
-    background:var(--card); border-radius:22px; padding:28px 22px; max-width:360px; width:100%;
+    background:var(--card); border-radius:24px; padding:26px 22px 20px; max-width:400px; width:100%;
     box-shadow:var(--shadow); text-align:center;
   }
-  .rfid-card .rfid-ico{font-size:48px; margin-bottom:8px;}
-  .rfid-card h2{font-size:22px; margin-bottom:6px;}
-  .rfid-card p{color:var(--forest-soft); font-size:14px; line-height:1.45; margin:0 0 14px;}
-  .rfid-pulse{
-    width:64px; height:64px; margin:10px auto 16px; border-radius:50%;
-    border:3px solid var(--leaf); animation:rfidPulse 1.4s ease-in-out infinite;
+  .rfid-card .rfid-ico{font-size:44px; line-height:1; margin-bottom:6px;}
+  .rfid-card h2{font-size:22px; margin:0 0 6px;}
+  .rfid-card .rfid-lead{color:var(--forest-soft); font-size:14px; line-height:1.45; margin:0 0 12px;}
+  .rfid-steps{text-align:left; margin:0 0 14px; padding:0; list-style:none;}
+  .rfid-steps li{
+    display:flex; gap:10px; align-items:flex-start; font-size:13px; color:var(--forest-soft);
+    padding:8px 10px; border-radius:12px; margin-bottom:6px; background:var(--cream);
+    transition:background .2s, color .2s;
   }
+  .rfid-steps li b{color:var(--forest);}
+  .rfid-steps li.active{background:#E6F5EA; color:var(--forest);}
+  .rfid-steps li.done{background:#F0F7F2; color:var(--forest-soft);}
+  .rfid-steps li.done .n{background:var(--leaf-dark);}
+  .rfid-steps li.warn{background:#FFF3D6; color:#9A6B00;}
+  .rfid-steps li.warn .n{background:#D4A017;}
+  .rfid-steps .n{
+    flex:0 0 22px; height:22px; border-radius:50%; background:var(--leaf); color:#fff;
+    font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center;
+  }
+  .rfid-pulse{
+    width:72px; height:72px; margin:6px auto 12px; border-radius:50%;
+    border:3px solid var(--leaf); display:flex; align-items:center; justify-content:center;
+    font-size:28px; animation:rfidPulse 1.4s ease-in-out infinite;
+  }
+  .rfid-pulse.ok{border-color:var(--leaf-dark); animation:none; background:#E6F5EA;}
+  .rfid-pulse.link{border-color:#D4A017; animation:rfidPulse .9s ease-in-out infinite; background:#FFF8E8;}
+  .rfid-pulse.session{border-color:var(--leaf-dark); animation:none; background:#E6F5EA;}
   @keyframes rfidPulse{
     0%,100%{ transform:scale(1); opacity:1; }
-    50%{ transform:scale(1.12); opacity:.55; }
+    50%{ transform:scale(1.1); opacity:.55; }
   }
+  .rfid-countdown{
+    font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:800;
+    color:var(--leaf-dark); margin:4px 0 10px; letter-spacing:.04em;
+  }
+  .rfid-countdown.warn{color:#B94B2D;}
+  .rfid-account{
+    font-size:12px; color:var(--forest-soft); word-break:break-all; margin:0 0 10px;
+    background:var(--cream-2); border-radius:10px; padding:8px 10px; text-align:left;
+  }
+  .rfid-account code{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--forest);}
+  .rfid-account .lab{display:block; font-size:10px; font-weight:800; text-transform:uppercase;
+    letter-spacing:.04em; color:var(--forest-soft); margin-bottom:2px;}
   .rfid-status-pill{
-    display:none; font-size:11px; font-weight:800; padding:4px 10px; border-radius:999px;
-    background:#E6F5EA; color:var(--leaf-dark); margin-left:8px; vertical-align:middle;
+    display:inline-block; font-size:11px; font-weight:800; padding:4px 10px; border-radius:999px;
+    background:#F3EEDF; color:#8A7A5C; margin-left:8px; vertical-align:middle; cursor:pointer;
+    border:none;
   }
-  .rfid-status-pill.on{display:inline-block;}
+  .rfid-status-pill.on{background:#E6F5EA; color:var(--leaf-dark);}
+  .rfid-status-pill.wait{background:#FFF3D6; color:#9A6B00;}
+  .rfid-lock .btn-row{justify-content:center;}
+  .rfid-lock #btn-rfid-lock{min-width:160px; font-weight:800;}
+  .rfid-mode-hint{
+    font-size:12px; color:var(--forest-soft); margin:0 0 12px; line-height:1.4;
+    min-height:1.4em;
+  }
 
   .plc-chip{
     background:var(--cream); border-radius:12px; padding:8px 10px;
@@ -1307,7 +1347,7 @@
   <div id="app-shell" class="hidden">
     <div class="demo-banner">DEMO — Prototipo SIBU · Colegio Don Bosco · No es versión de producción</div>
     <div class="topbar">
-      <div class="brand"><span class="logo">♻️</span><span>SIBU</span><span class="rfid-status-pill" id="rfid-pill">RFID OK</span></div>
+      <div class="brand"><span class="logo">♻️</span><span>SIBU</span><button type="button" class="rfid-status-pill" id="rfid-pill">🔒 RFID</button></div>
       <div class="navpills">
         <button class="pill" data-view="stations">🏠</button>
         <button class="pill" data-view="vision">📷</button>
@@ -1787,17 +1827,29 @@
 
 <div class="toast" id="toast"></div>
 
-<!-- Candado RFID para HMI / cámara / PLC real -->
+<!-- Candado RFID por cuenta Google -->
 <div class="rfid-lock" id="rfid-lock" aria-hidden="true">
   <div class="rfid-card">
-    <div class="rfid-ico">💳</div>
-    <h2>Acceso con tarjeta</h2>
-    <p>Para abrir el panel de estación (HMI, cámara o PLC) acercá tu tarjeta RFID al lector.</p>
-    <div class="rfid-pulse" aria-hidden="true"></div>
-    <p class="vision-hint" id="rfid-lock-msg">Esperando tap en RC522…</p>
-    <div class="btn-row" style="margin-top:8px;">
-      <button class="btn btn-outline" type="button" id="btn-rfid-cancel">Volver</button>
-      <button class="btn btn-danger" type="button" id="btn-rfid-lock" title="Cerrar acceso RFID">Bloquear</button>
+    <div class="rfid-ico" id="rfid-ico">💳</div>
+    <h2 id="rfid-title">Acceso de estación</h2>
+    <p class="rfid-lead" id="rfid-lead">Solo <b>tu</b> cuenta Google + <b>tu</b> tarjeta abren HMI, cámara y PLC.</p>
+    <ul class="rfid-steps" id="rfid-steps">
+      <li class="active" id="rfid-step-wait"><span class="n">1</span><span><b>Acercá tu tarjeta</b> al lector RC522</span></li>
+      <li id="rfid-step-ok"><span class="n">2</span><span><b>Entrá</b> al panel (HMI / cámara / PLC)</span></li>
+      <li id="rfid-step-lock"><span class="n">3</span><span><b>Bloqueá</b> al terminar — o esperá a que expire</span></li>
+    </ul>
+    <div class="rfid-pulse" id="rfid-pulse" aria-hidden="true">📡</div>
+    <div class="rfid-countdown hidden" id="rfid-countdown">—</div>
+    <p class="rfid-mode-hint" id="rfid-lock-msg">Esperando tu tarjeta…</p>
+    <div class="rfid-account" id="rfid-account">
+      <span class="lab">Tu cuenta</span>
+      <span id="rfid-account-name">—</span><br>
+      <code id="rfid-account-uid">—</code>
+    </div>
+    <div class="btn-row" style="margin-top:10px; flex-wrap:wrap;">
+      <button class="btn btn-outline" type="button" id="btn-rfid-cancel">Cancelar</button>
+      <button class="btn btn-primary" type="button" id="btn-rfid-link">Vincular mi tarjeta</button>
+      <button class="btn btn-danger hidden" type="button" id="btn-rfid-lock">🔒 Bloquear ahora</button>
     </div>
   </div>
 </div>
@@ -2150,6 +2202,10 @@ onAuthStateChanged(auth, async (user) => {
     // Sin Google: no se puede entrar
     currentUser = null;
     isAdmin = false;
+    stopRfidListen();
+    rfidPendingView = null;
+    rfidLinking = false;
+    showRfidLock(false);
     detenerEscuchaSesion();
     if(typeof unsubHmiSesion !== "undefined" && unsubHmiSesion){
       try{ unsubHmiSesion(); }catch(e){}
@@ -2203,25 +2259,141 @@ document.querySelectorAll(".navpills .pill[data-view]").forEach(btn => {
 });
 
 /* -------------------------------------------------------------------------
-   RFID GATE — ESP32 RC522 → Pi → rfid_gate/sibu → desbloquea paneles
+   RFID GATE — por CUENTA Google (rfid_gate/{authUid})
+   ESP32 → Pi :8081 → desbloquea SOLO el doc del operador dueño de la tarjeta
    ------------------------------------------------------------------------- */
 const RFID_PROTECTED = new Set(["hmi", "vision", "plc-real"]);
-const RFID_GATE_REF = () => doc(db, "rfid_gate", "sibu");
+const RFID_GATE_REF = () => {
+  if(!currentUser) throw new Error("sin sesión");
+  return doc(db, "rfid_gate", currentUser.uid);
+};
+const RFID_LINK_REF = () => {
+  if(!currentUser) throw new Error("sin sesión");
+  return doc(db, "rfid_link_pending", currentUser.uid);
+};
+
 let rfidUnsub = null;
-let rfidState = { unlocked: false, untilMs: 0, nombre: null, uid: null };
+let rfidListenUid = null;
+let rfidState = { unlocked: false, untilMs: 0, nombre: null, cardUid: null };
 let rfidPendingView = null;
 let rfidExpireTimer = null;
+let rfidLinking = false;
+let rfidLinkTimer = null;
+let rfidUiMode = "wait"; // wait | link | session
 
 function isRfidUnlocked(){
   return !!(rfidState.unlocked && rfidState.untilMs && Date.now() < rfidState.untilMs);
 }
 
-function showRfidLock(on){
+function rfidLeftSec(){
+  return Math.max(0, Math.round((rfidState.untilMs - Date.now()) / 1000));
+}
+
+function fmtRfidTime(sec){
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m}:${String(s).padStart(2,"0")}` : `${s}s`;
+}
+
+function setRfidSteps(mode){
+  const wait = $("rfid-step-wait");
+  const ok = $("rfid-step-ok");
+  const lock = $("rfid-step-lock");
+  [wait, ok, lock].forEach(el => el?.classList.remove("active","done","warn"));
+  if(mode === "link"){
+    wait?.classList.add("warn");
+    if(wait) wait.querySelector("span:last-child").innerHTML = "<b>Acercá la tarjeta</b> para vincularla a esta cuenta";
+  } else if(mode === "session"){
+    wait?.classList.add("done");
+    ok?.classList.add("done");
+    lock?.classList.add("active");
+    if(wait) wait.querySelector("span:last-child").innerHTML = "<b>Tarjeta leída</b> — acceso abierto";
+  } else {
+    wait?.classList.add("active");
+    if(wait) wait.querySelector("span:last-child").innerHTML = "<b>Acercá tu tarjeta</b> al lector RC522";
+  }
+}
+
+function paintRfidAccount(){
+  const nameEl = $("rfid-account-name");
+  const uidEl = $("rfid-account-uid");
+  if(!currentUser){
+    if(nameEl) nameEl.textContent = "—";
+    if(uidEl) uidEl.textContent = "—";
+    return;
+  }
+  if(nameEl) nameEl.textContent = currentUser.displayName || currentUser.email || "Operador";
+  if(uidEl) uidEl.textContent = currentUser.uid;
+}
+
+function paintRfidUi(forceMode){
+  const unlocked = isRfidUnlocked();
+  const mode = forceMode || (rfidLinking ? "link" : (unlocked ? "session" : "wait"));
+  rfidUiMode = mode;
+
+  const title = $("rfid-title");
+  const lead = $("rfid-lead");
+  const msg = $("rfid-lock-msg");
+  const pulse = $("rfid-pulse");
+  const ico = $("rfid-ico");
+  const cd = $("rfid-countdown");
+  const btnLink = $("btn-rfid-link");
+  const btnLock = $("btn-rfid-lock");
+  const btnCancel = $("btn-rfid-cancel");
+
+  paintRfidAccount();
+  setRfidSteps(mode);
+  pulse?.classList.remove("ok","link","session");
+
+  if(mode === "session"){
+    if(title) title.textContent = "Sesión abierta";
+    if(lead) lead.innerHTML = "Esta sesión es <b>solo tuya</b>. Al terminar, bloqueá el acceso.";
+    if(ico) ico.textContent = "✅";
+    pulse?.classList.add("session");
+    if(pulse) pulse.textContent = "🔓";
+    const left = rfidLeftSec();
+    cd?.classList.remove("hidden");
+    cd?.classList.toggle("warn", left <= 30);
+    if(cd) cd.textContent = fmtRfidTime(left);
+    if(msg) msg.textContent = (rfidState.nombre || "Operador")
+      + (rfidState.cardUid ? ` · tarjeta ${rfidState.cardUid}` : "")
+      + " · expira sola si no bloqueás";
+    btnLock?.classList.remove("hidden");
+    btnLink?.classList.add("hidden");
+    if(btnCancel) btnCancel.textContent = "Seguir trabajando";
+  } else if(mode === "link"){
+    if(title) title.textContent = "Vinculando tarjeta";
+    if(lead) lead.innerHTML = "Acercá <b>tu</b> tarjeta al RC522 en los próximos 90 s. Quedará unida a esta cuenta Google.";
+    if(ico) ico.textContent = "🔗";
+    pulse?.classList.add("link");
+    if(pulse) pulse.textContent = "📡";
+    cd?.classList.add("hidden");
+    if(msg) msg.textContent = "Esperando tap para vincular…";
+    btnLock?.classList.add("hidden");
+    btnLink?.classList.add("hidden");
+    if(btnCancel) btnCancel.textContent = "Cancelar vínculo";
+  } else {
+    if(title) title.textContent = "Acceso de estación";
+    if(lead) lead.innerHTML = "Solo <b>tu</b> cuenta Google + <b>tu</b> tarjeta abren HMI, cámara y PLC.";
+    if(ico) ico.textContent = "💳";
+    if(pulse) pulse.textContent = "📡";
+    cd?.classList.add("hidden");
+    if(msg) msg.textContent = "Esperando tu tarjeta…";
+    btnLock?.classList.add("hidden");
+    btnLink?.classList.remove("hidden");
+    if(btnCancel) btnCancel.textContent = "Cancelar";
+  }
+}
+
+function showRfidLock(on, mode){
   const el = $("rfid-lock");
   if(!el) return;
   el.classList.toggle("show", !!on);
   el.setAttribute("aria-hidden", on ? "false" : "true");
-  if(on) ensureRfidListen();
+  if(on){
+    ensureRfidListen();
+    paintRfidUi(mode || (isRfidUnlocked() ? "session" : (rfidLinking ? "link" : "wait")));
+  }
 }
 
 function updateRfidPill(){
@@ -2229,9 +2401,13 @@ function updateRfidPill(){
   if(!pill) return;
   const ok = isRfidUnlocked();
   pill.classList.toggle("on", ok);
+  pill.classList.toggle("wait", !ok && rfidLinking);
   if(ok){
-    const left = Math.max(0, Math.round((rfidState.untilMs - Date.now()) / 1000));
-    pill.textContent = (rfidState.nombre || "RFID") + " · " + left + "s";
+    pill.textContent = "🔓 " + fmtRfidTime(rfidLeftSec());
+  } else if(rfidLinking){
+    pill.textContent = "🔗 Vinculando…";
+  } else {
+    pill.textContent = "🔒 RFID";
   }
 }
 
@@ -2239,47 +2415,73 @@ function scheduleRfidExpire(){
   if(rfidExpireTimer) clearInterval(rfidExpireTimer);
   rfidExpireTimer = setInterval(() => {
     updateRfidPill();
+    if($("rfid-lock")?.classList.contains("show") && isRfidUnlocked()){
+      paintRfidUi("session");
+    }
     if(!isRfidUnlocked()){
       clearInterval(rfidExpireTimer);
       rfidExpireTimer = null;
-      // si estamos en vista protegida, cerrar
       const active = document.querySelector(".navpills .pill.active");
       const v = active?.dataset?.view;
       if(v && RFID_PROTECTED.has(v)){
-        toast("Sesión RFID expiró");
+        toast("Tu acceso RFID expiró");
         showAppView("stations");
       }
-      showRfidLock(false);
+      if($("rfid-lock")?.classList.contains("show")){
+        paintRfidUi("wait");
+      } else {
+        showRfidLock(false);
+      }
+      updateRfidPill();
     }
   }, 1000);
 }
 
+function stopRfidListen(){
+  if(rfidUnsub){
+    try{ rfidUnsub(); }catch(e){}
+    rfidUnsub = null;
+  }
+  rfidListenUid = null;
+  rfidState = { unlocked: false, untilMs: 0, nombre: null, cardUid: null };
+  if(rfidExpireTimer){ clearInterval(rfidExpireTimer); rfidExpireTimer = null; }
+  updateRfidPill();
+}
+
 function ensureRfidListen(){
-  if(rfidUnsub) return;
+  if(!currentUser) return;
+  if(rfidUnsub && rfidListenUid === currentUser.uid) return;
+  stopRfidListen();
+  rfidListenUid = currentUser.uid;
   rfidUnsub = onSnapshot(RFID_GATE_REF(), (snap) => {
     const d = snap.exists() ? (snap.data() || {}) : {};
+    const was = isRfidUnlocked();
     rfidState = {
       unlocked: !!d.unlocked,
       untilMs: Number(d.untilMs) || 0,
       nombre: d.nombre || null,
-      uid: d.uid || null
+      cardUid: d.cardUid || null
     };
     updateRfidPill();
-    const msg = $("rfid-lock-msg");
     if(isRfidUnlocked()){
-      if(msg) msg.textContent = "Acceso: " + (rfidState.nombre || rfidState.uid || "OK");
+      rfidLinking = false;
+      if(rfidLinkTimer){ clearTimeout(rfidLinkTimer); rfidLinkTimer = null; }
       scheduleRfidExpire();
-      showRfidLock(false);
       if(rfidPendingView){
         const next = rfidPendingView;
         rfidPendingView = null;
+        showRfidLock(false);
         if(next === "plc-real") ensureRealListen();
         if(next === "hmi") ensureHmiListen();
         showAppView(next);
+        toast("Acceso · " + (rfidState.nombre || "OK"));
+      } else if($("rfid-lock")?.classList.contains("show")){
+        paintRfidUi("session");
+      } else if(!was){
         toast("RFID · " + (rfidState.nombre || "desbloqueado"));
       }
-    } else {
-      if(msg) msg.textContent = "Esperando tap en RC522…";
+    } else if($("rfid-lock")?.classList.contains("show")){
+      paintRfidUi(rfidLinking ? "link" : "wait");
     }
   }, (err) => {
     console.error(err);
@@ -2288,41 +2490,108 @@ function ensureRfidListen(){
   });
 }
 
-$("btn-rfid-cancel")?.addEventListener("click", () => {
+async function cancelRfidLink(){
+  rfidLinking = false;
+  if(rfidLinkTimer){ clearTimeout(rfidLinkTimer); rfidLinkTimer = null; }
+  if(!currentUser) return;
+  try{
+    await setDoc(RFID_LINK_REF(), {
+      authUid: currentUser.uid,
+      expiresMs: 0,
+      cancelled: true,
+      at: serverTimestamp()
+    }, { merge: true });
+  }catch(e){ /* ignore */ }
+}
+
+$("btn-rfid-cancel")?.addEventListener("click", async () => {
+  if(rfidLinking){
+    await cancelRfidLink();
+    paintRfidUi("wait");
+    updateRfidPill();
+    toast("Vínculo cancelado");
+    return;
+  }
+  if(isRfidUnlocked()){
+    // "Seguir trabajando" — solo cierra el modal
+    showRfidLock(false);
+    return;
+  }
   rfidPendingView = null;
   showRfidLock(false);
   showAppView("stations");
 });
 
+$("btn-rfid-link")?.addEventListener("click", async () => {
+  if(!currentUser){
+    toast("Iniciá sesión primero");
+    return;
+  }
+  try{
+    const expiresMs = Date.now() + 90_000;
+    await setDoc(RFID_LINK_REF(), {
+      authUid: currentUser.uid,
+      nombre: currentUser.displayName || currentUser.email || "Operador",
+      expiresMs,
+      at: serverTimestamp()
+    }, { merge: true });
+    rfidLinking = true;
+    if(rfidLinkTimer) clearTimeout(rfidLinkTimer);
+    rfidLinkTimer = setTimeout(async () => {
+      rfidLinking = false;
+      updateRfidPill();
+      if($("rfid-lock")?.classList.contains("show") && !isRfidUnlocked()){
+        paintRfidUi("wait");
+        toast("Tiempo de vínculo agotado — reintentá");
+      }
+    }, 90_000);
+    paintRfidUi("link");
+    updateRfidPill();
+    toast("Acercá la tarjeta al lector (90 s)");
+  }catch(e){
+    console.error(e);
+    toast("No se pudo pedir vínculo: " + (e.message || e));
+  }
+});
+
 $("btn-rfid-lock")?.addEventListener("click", async () => {
+  if(!currentUser){
+    toast("Sin sesión");
+    return;
+  }
   try{
     await setDoc(RFID_GATE_REF(), {
       unlocked: false,
       untilMs: 0,
-      uid: null,
+      cardUid: null,
       nombre: null,
+      authUid: currentUser.uid,
       at: serverTimestamp()
     }, { merge: true });
-    toast("Acceso RFID bloqueado");
+    toast("Acceso bloqueado en tu cuenta");
     rfidPendingView = null;
     showRfidLock(false);
-    showAppView("stations");
+    const active = document.querySelector(".navpills .pill.active");
+    const v = active?.dataset?.view;
+    if(v && RFID_PROTECTED.has(v)) showAppView("stations");
   }catch(e){
-    // Si rules no permiten write desde cliente, pedir a la Pi
-    toast("No se pudo bloquear desde la web (rules). Usá curl /api/lock en la Pi.");
+    console.error(e);
+    toast("No se pudo bloquear: " + (e.message || e));
   }
 });
 
 $("rfid-pill")?.addEventListener("click", () => {
+  if(!currentUser){
+    toast("Iniciá sesión para usar RFID");
+    return;
+  }
+  ensureRfidListen();
   if(isRfidUnlocked()){
-    showRfidLock(true);
-    const msg = $("rfid-lock-msg");
-    if(msg) msg.textContent = "Sesión activa: " + (rfidState.nombre || "") + " — podés bloquear.";
+    showRfidLock(true, "session");
+  } else {
+    showRfidLock(true, rfidLinking ? "link" : "wait");
   }
 });
-
-// Escuchar RFID apenas hay sesión (para el pill)
-// (se llama desde onAuthStateChanged vía ensureRfidListen al primer panel)
 
 /* -------------------------------------------------------------------------
    PRUEBA VISIÓN — cámara Pi vía Firestore (sirve desde la página SIBU)

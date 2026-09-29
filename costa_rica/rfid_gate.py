@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """
-SIBU — RFID gate (ESP32 RC522 → Pi → Firestore → web)
+SIBU — RFID por CUENTA (no global)
 
-ESP32 hace:
-  POST http://IP_PI:8081/api/rfid
-  { "uid": "A1B2C3D4" }
+ESP32: POST /api/rfid { "uid": "A7240B9F" }
 
-La Pi valida contra RFID_ALLOW (env) o Firestore rfid_tarjetas/{uid}
-y escribe:
-  rfid_gate/sibu { unlocked, uid, nombre, untilMs, at }
+1) Si hay rfid_link_pending/{authUid} vigente → vincula tarjeta a ese authUid
+2) Si no, busca rfid_tarjetas/{UID} o allowlist UID:Nombre:authUid
+3) Escribe rfid_gate/{authUid} { unlocked, untilMs, cardUid, nombre }
 
-La web desbloquea HMI / 📷 / plc-real mientras untilMs > now.
+Cada usuario de Google solo desbloquea SU documento.
 """
 
 from __future__ import annotations
@@ -32,24 +30,36 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def norm_uid(uid: str) -> str:
     u = (uid or "").strip().upper().replace(":", "").replace("-", "").replace(" ", "")
-    return u
+    return u.strip('"').strip("'")
 
 
-def load_allow_env() -> dict[str, str]:
-    """RFID_ALLOW=A1B2C3D4:Operador1,DEADBEEF:Carla"""
-    raw = os.environ.get("RFID_ALLOW", "").strip()
-    out: dict[str, str] = {}
-    if not raw:
-        return out
-    for part in raw.split(","):
-        part = part.strip()
-        if not part:
-            continue
-        if ":" in part:
-            uid, name = part.split(":", 1)
-            out[norm_uid(uid)] = name.strip() or "Operador"
-        else:
-            out[norm_uid(part)] = "Operador"
+def load_allow() -> dict[str, dict]:
+    """
+    Línea: CARDUID:Nombre:authUid
+    o CARDUID:Nombre  (sin cuenta → solo válida tras vincular en app)
+    """
+    out: dict[str, dict] = {}
+
+    def add_line(part: str) -> None:
+        part = part.strip().strip('"').strip("'")
+        if not part or part.startswith("#"):
+            return
+        bits = [b.strip() for b in part.split(":")]
+        if not bits:
+            return
+        card = norm_uid(bits[0])
+        nombre = bits[1] if len(bits) > 1 else "Operador"
+        auth = bits[2] if len(bits) > 2 else ""
+        out[card] = {"nombre": nombre or "Operador", "authUid": auth}
+
+    raw = (os.environ.get("RFID_ALLOW", "") or "").strip().strip('"').strip("'")
+    for part in raw.replace(";", ",").split(","):
+        add_line(part)
+
+    allow_file = ROOT / "costa_rica" / "rfid_allow.txt"
+    if allow_file.is_file():
+        for line in allow_file.read_text(encoding="utf-8").splitlines():
+            add_line(line)
     return out
 
 
@@ -58,13 +68,7 @@ def main() -> None:
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=int(os.environ.get("RFID_PORT", "8081")))
     p.add_argument("--service-account", default=str(ROOT / "serviceAccountKey.json"))
-    p.add_argument(
-        "--ttl",
-        type=int,
-        default=int(os.environ.get("RFID_TTL_SEC", "300")),
-        help="Segundos de desbloqueo tras tap",
-    )
-    p.add_argument("--gate-doc", default="sibu")
+    p.add_argument("--ttl", type=int, default=int(os.environ.get("RFID_TTL_SEC", "300")))
     args = p.parse_args()
 
     sa = Path(args.service_account)
@@ -75,52 +79,85 @@ def main() -> None:
     if not firebase_admin._apps:
         firebase_admin.initialize_app(credentials.Certificate(str(sa)))
     fs = firestore.client()
-    gate_ref = fs.collection("rfid_gate").document(args.gate_doc)
-    allow_env = load_allow_env()
-    print(f"RFID allow (env): {len(allow_env)} tarjeta(s)")
-    print(f"HTTP :{args.port}  TTL={args.ttl}s  doc=rfid_gate/{args.gate_doc}")
+    allow = load_allow()
+    print(f"RFID allow file/env: {len(allow)} → {list(allow.keys())}")
+    sys.stdout.flush()
 
-    def lookup(uid: str) -> tuple[bool, str]:
-        u = norm_uid(uid)
-        if not u:
-            return False, ""
-        if u in allow_env:
-            return True, allow_env[u]
-        # Firestore rfid_tarjetas/{uid} { activa: true, nombre: "..." }
+    def lookup_card(card: str) -> dict | None:
+        c = norm_uid(card)
+        if c in allow and allow[c].get("authUid"):
+            return {"nombre": allow[c]["nombre"], "authUid": allow[c]["authUid"], "cardUid": c}
         try:
-            snap = fs.collection("rfid_tarjetas").document(u).get()
+            snap = fs.collection("rfid_tarjetas").document(c).get()
             if snap.exists:
                 d = snap.to_dict() or {}
-                if d.get("activa", True):
-                    return True, str(d.get("nombre") or "Operador")
+                if d.get("activa", True) and d.get("authUid"):
+                    return {
+                        "nombre": str(d.get("nombre") or "Operador"),
+                        "authUid": str(d["authUid"]),
+                        "cardUid": c,
+                    }
         except Exception as e:
-            print(f"⚠️  lookup firestore: {e}")
-        return False, ""
+            print(f"⚠️  lookup: {e}")
+        # allow sin authUid → conocida pero no vinculada
+        if c in allow:
+            return {"nombre": allow[c]["nombre"], "authUid": "", "cardUid": c}
+        return None
 
-    def unlock(uid: str, nombre: str) -> dict:
+    def unlock_account(auth_uid: str, nombre: str, card_uid: str) -> dict:
         until_ms = int(time.time() * 1000) + args.ttl * 1000
         payload = {
             "unlocked": True,
-            "uid": norm_uid(uid),
+            "cardUid": card_uid,
             "nombre": nombre,
+            "authUid": auth_uid,
             "untilMs": until_ms,
             "ttlSec": args.ttl,
             "at": firestore.SERVER_TIMESTAMP,
         }
-        gate_ref.set(payload, merge=True)
+        fs.collection("rfid_gate").document(auth_uid).set(payload, merge=True)
         return payload
 
-    def lock() -> None:
-        gate_ref.set(
+    def try_pending_link(card: str) -> dict | None:
+        """Si alguien en la web pidió vincular, asigna esta tarjeta a SU cuenta."""
+        now = int(time.time() * 1000)
+        best = None
+        best_exp = 0
+        for snap in fs.collection("rfid_link_pending").stream():
+            d = snap.to_dict() or {}
+            auth_uid = str(d.get("authUid") or snap.id or "")
+            expires = int(d.get("expiresMs") or 0)
+            if not auth_uid:
+                continue
+            if expires and now > expires:
+                try:
+                    snap.reference.delete()
+                except Exception:
+                    pass
+                continue
+            # el más reciente (mayor expiresMs) gana si hay varios
+            if expires >= best_exp:
+                best = (snap.reference, auth_uid, str(d.get("nombre") or "Operador"))
+                best_exp = expires
+        if not best:
+            return None
+        ref, auth_uid, nombre = best
+        c = norm_uid(card)
+        fs.collection("rfid_tarjetas").document(c).set(
             {
-                "unlocked": False,
-                "uid": None,
-                "nombre": None,
-                "untilMs": 0,
-                "at": firestore.SERVER_TIMESTAMP,
+                "activa": True,
+                "nombre": nombre,
+                "authUid": auth_uid,
+                "vinculadaAt": firestore.SERVER_TIMESTAMP,
             },
             merge=True,
         )
+        try:
+            ref.delete()
+        except Exception:
+            pass
+        print(f"LINK card={c} → authUid={auth_uid}")
+        return unlock_account(auth_uid, nombre, c)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt: str, *a) -> None:
@@ -146,42 +183,57 @@ def main() -> None:
             self.end_headers()
 
         def do_GET(self) -> None:
-            path = urlparse(self.path).path
-            if path == "/api/health":
-                self._json(200, {"ok": True, "service": "rfid_gate", "ttl": args.ttl})
+            if urlparse(self.path).path == "/api/health":
+                self._json(200, {"ok": True, "perAccount": True, "ttl": args.ttl})
                 return
-            if path == "/api/status":
-                snap = gate_ref.get()
-                d = snap.to_dict() if snap.exists else {}
-                self._json(200, {"ok": True, "gate": d})
-                return
-            self._json(404, {"ok": False, "error": "not found"})
+            self._json(404, {"ok": False})
 
         def do_POST(self) -> None:
             path = urlparse(self.path).path
             n = int(self.headers.get("Content-Length") or 0)
-            body = self.rfile.read(n) if n else b"{}"
             try:
-                data = json.loads(body.decode("utf-8") or "{}")
+                data = json.loads((self.rfile.read(n) if n else b"{}").decode("utf-8") or "{}")
             except Exception:
                 self._json(400, {"ok": False, "error": "JSON inválido"})
                 return
 
             if path == "/api/rfid":
-                uid = data.get("uid") or data.get("UID") or ""
-                ok, nombre = lookup(uid)
-                if not ok:
-                    print(f"DENY uid={norm_uid(uid)}")
-                    self._json(403, {"ok": False, "error": "tarjeta no autorizada", "uid": norm_uid(uid)})
+                card = data.get("uid") or ""
+                # 1) vincular pendiente
+                try:
+                    linked = try_pending_link(card)
+                except Exception as e:
+                    print(f"⚠️  link: {e}")
+                    linked = None
+                if linked:
+                    self._json(200, {"ok": True, "linked": True, **{k: linked[k] for k in ("nombre", "untilMs", "ttlSec") if k in linked}, "authUid": linked.get("authUid"), "cardUid": linked.get("cardUid")})
                     return
-                payload = unlock(uid, nombre)
-                print(f"ALLOW {nombre} uid={norm_uid(uid)} untilMs={payload['untilMs']}")
+
+                info = lookup_card(card)
+                if not info:
+                    print(f"DENY unknown card={norm_uid(card)}")
+                    self._json(403, {"ok": False, "error": "tarjeta desconocida", "uid": norm_uid(card)})
+                    return
+                if not info.get("authUid"):
+                    print(f"DENY card={info['cardUid']} sin cuenta vinculada")
+                    self._json(
+                        403,
+                        {
+                            "ok": False,
+                            "error": "tarjeta sin cuenta: vinculá desde la app (botón Vincular)",
+                            "uid": info["cardUid"],
+                        },
+                    )
+                    return
+                payload = unlock_account(info["authUid"], info["nombre"], info["cardUid"])
+                print(f"ALLOW {info['nombre']} card={info['cardUid']} user={info['authUid']}")
                 self._json(
                     200,
                     {
                         "ok": True,
-                        "nombre": nombre,
-                        "uid": norm_uid(uid),
+                        "nombre": info["nombre"],
+                        "authUid": info["authUid"],
+                        "cardUid": info["cardUid"],
                         "untilMs": payload["untilMs"],
                         "ttlSec": args.ttl,
                     },
@@ -189,21 +241,26 @@ def main() -> None:
                 return
 
             if path == "/api/lock":
-                lock()
-                self._json(200, {"ok": True, "unlocked": False})
+                auth_uid = str(data.get("authUid") or "")
+                if not auth_uid:
+                    self._json(400, {"ok": False, "error": "falta authUid"})
+                    return
+                fs.collection("rfid_gate").document(auth_uid).set(
+                    {
+                        "unlocked": False,
+                        "untilMs": 0,
+                        "cardUid": None,
+                        "at": firestore.SERVER_TIMESTAMP,
+                    },
+                    merge=True,
+                )
+                self._json(200, {"ok": True})
                 return
 
-            self._json(404, {"ok": False, "error": "not found"})
-
-    # Estado inicial: no bloquees el bind si Firestore falla
-    try:
-        lock()
-        print("Firestore gate → locked")
-    except Exception as e:
-        print(f"⚠️  no se pudo lock inicial en Firestore: {e}")
+            self._json(404, {"ok": False})
 
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
-    print(f"✅ RFID gate ESCUCHANDO http://0.0.0.0:{args.port}  POST /api/rfid")
+    print(f"✅ RFID gate (por cuenta) :{args.port}")
     sys.stdout.flush()
     try:
         httpd.serve_forever()

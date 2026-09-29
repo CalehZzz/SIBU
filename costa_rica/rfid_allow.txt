@@ -1,0 +1,7 @@
+# Formato: CARD_UID:Nombre:FIREBASE_AUTH_UID
+# El authUid lo ves en la app (pantalla RFID) o Firebase Auth.
+# Si solo ponés CARD_UID:Nombre, hay que "Vincular" una vez desde la web.
+#
+# Ejemplo (reemplazá el tercer campo por tu uid de Google):
+# A7240B9F:SIBUA:xxxxxxxxxxxxxxxxxxxx
+A7240B9F:SIBUA
