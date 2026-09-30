@@ -1,5 +1,5 @@
 [Unit]
-Description=SIBU RFID gate (ESP32 RC522 -> Firestore unlock)
+Description=SIBU RFID gate (ESP32 RC522 WiFi/HTTP -> Firestore unlock)
 After=network-online.target
 Wants=network-online.target
 

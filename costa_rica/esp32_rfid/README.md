@@ -1,7 +1,5 @@
-# ESP32 RFID (legado)
+# ESP32 RFID (legado — sketch solo)
 
-> **Preferido ahora:** Arduino Uno + RC522 por USB → Pi  
-> Ver [`../arduino_rfid/`](../arduino_rfid/).
+> **Preferido:** un solo ESP32 con botes + báscula + RFID → [`../arduino_bins/`](../arduino_bins/).
 
-Este sketch (WiFi POST `:8081`) queda como respaldo si no usás Arduino.
-El ESP32 de mesa se usa para **botes + LCD + HX711** (`../arduino_bins/`).
+Este sketch solo POST a `:8081`. Los pines VSPI (18/19/22) **chocan** con el sketch unificado; no lo uses en la misma placa que los HC/LCD.
