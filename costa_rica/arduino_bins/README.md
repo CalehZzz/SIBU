@@ -1,104 +1,130 @@
-# ESP32 · Botes (demo) + LCD + báscula HX711
+# ESP32 · mesa unificada (botes + báscula + RFID)
 
-## Arquitectura
+Un solo ESP32. **No hace falta Arduino** para la tarjeta.
 
 ```
-ESP32 ─WiFi POST─→ Pi :8082 /api/bins → Firestore bins_pi/estado → web
-  ├─ HC-SR04 plástico
-  ├─ HC-SR04 rechazo
-  ├─ LCD I2C ( % plástico + kg )
-  └─ HX711 (peso plástico ejemplo)
+ESP32
+  ├─ 2× HC-SR04     ─┐
+  ├─ LCD I2C        ├─→ WiFi POST Pi :8082 /api/bins  → bins_pi/estado
+  ├─ HX711          ─┘
+  └─ RC522 RFID     ──→ WiFi POST Pi :8081 /api/rfid  → unlock web
 ```
 
-## Si ves esto en el Serial
+## ¿Se satura el ESP32?
 
-```json
-"plastico":{"cm":-1.0,...}, "rechazo":{"cm":3.0,"pct":100,"lleno":true}, "lamp":"red"
-```
+**No.** Carga típica:
 
-| Campo | Significado |
-|---|---|
-| `plastico.cm = -1` | **Sin eco** en HC plástico (TRIG/ECHO/VCC/GND o pin malo) |
-| `rechazo.cm ≈ 3–5` | El HC rechazo **sí mide**, pero algo está a ~3 cm → lo toma como **lleno** → rojo |
-| `lamp=red` / `stop=true` | Consecuencia de rechazo “lleno” |
-
-No es la Pi ni Firestore: es el HC / montaje / calibración.
-
-### Qué hacer YA
-
-1. `git pull` y **re-flash** `bins_nivel.ino` (pines nuevos + debug).
-2. Serial 115200 — buscá líneas `HC0 plastico` / `HC1 rechazo`.
-3. **Aire libre** (no dentro del bote): poné la mano a ~20 cm de cada sensor.
-
-| Resultado | Acción |
-|---|---|
-| `HC0 FAIL us=0` | Cableá de nuevo plástico: TRIG **18** · ECHO **19** · VCC **5V** · GND |
-| `HC1 cm=3` fijo sin nada delante | Sensor mirando a una pared/tapa a 3 cm, o Echo mal; apuntá al techo/aire |
-| Mano a 20 cm → `cm≈20` | Sensor OK → montá en bote vacío, copiá ese `cm` a `VACIO_CM` |
-| Intercambiás los 2 módulos y el FAIL se mueve | El módulo está malo |
-| Intercambiás y el FAIL se queda en plástico | Cable/pin de ese canal |
-
-### Pines (actualizados — GPIO 12 ya no)
-
-| Sensor | TRIG | ECHO |
+| Tarea | Cada cuánto | Costo |
 |---|---|---|
-| Plástico | GPIO **18** | GPIO **19** |
-| Rechazo | GPIO **33** | GPIO **32** |
+| Poll RC522 | ~15–20 ms | casi nada |
+| 2× HC-SR04 | ~400 ms | ~60–100 ms bloqueantes |
+| HX711 | con los bins | bajo |
+| POST bins | ~400 ms | 1 HTTP corto |
+| POST RFID | solo al tap | 1 HTTP |
 
-VCC ambos HC → **5 V** · GND común con ESP32.  
-Echo es 5 V: ideal divisor 1k+2k a 3.3 V (si no, a veces anda igual un rato).
-
-### Calibrar % del bote
-
-1. Bote **vacío**, sensor arriba mirando al fondo → anotá `cm=` (ej. 32).  
-2. En el `.ino`: `VACIO_CM[i] = 32`.  
-3. `LLENO_CM[i]` ≈ distancia con el bote casi lleno (ej. 8).  
-4. Re-flash.
-
-Si vacío te da 3 cm, el sensor **no** está mirando el fondo del bote (está tapado o muy cerca de una cara).
-
-Para probar sin rojo permanente: `DEMO_NO_STOP = true` en el `.ino`.
+Es una fracción de lo que aguanta un ESP32. Si más adelante sumás 2 HC más, seguí bien; si notás lag en el tap, bajá `DEBUG_HC` o subí el intervalo de bins a 600 ms.
 
 ---
 
-## Conexiones resto
+## Pines
 
-### LCD I2C 1602
+### HC-SR04
 
-| LCD | ESP32 |
-|---|---|
-| VCC | 5 V / 3V3 |
-| GND | GND |
-| SDA | **21** |
-| SCL | **22** |
-| Addr | `0x27` (o `0x3F`) |
+| Sensor | TRIG | ECHO |
+|---|---|---|
+| Plástico | **18** | **19** |
+| Rechazo | **33** | **32** |
+
+VCC → 5 V · GND común.
+
+### RC522 (RFID) — **3.3 V nada más**
+
+En el módulo el pin suele decir **SDA** (a veces NSS/SS). Es el **chip-select SPI**, no I2C: va a GPIO **5**, no al 21 del LCD.
+
+| RC522 (serigrafía) | ESP32 | Nota |
+|---|---|---|
+| **SDA** / SS / NSS | **5** | chip select |
+| SCK | **14** | |
+| MOSI | **13** | |
+| MISO | **23** | |
+| RST / RESET | **15** | |
+| 3.3V | **3.3V** | nunca 5 V |
+| GND | GND | |
+
+### LCD I2C
+
+SDA **21** · SCL **22** · addr `0x27`
 
 ### HX711
 
-| HX711 | ESP32 |
-|---|---|
-| DT | **26** |
-| SCK | **25** |
+DT **26** · SCK **25**
 
-### Salidas opcionales
+### LEDs / full (opcionales)
 
 | Señal | GPIO |
 |---|---|
-| Full plástico | 16 |
-| Full rechazo | **27** |
-| LED Y / R / G | 4 / 5 / 15 |
+| Full plástico | off (`-1`) |
+| Full rechazo | 27 (opcional) |
+| LED amarillo | 4 |
+| LED rojo | **2** (GPIO 5 = SDA/SS del RC522) |
+| LED verde | 15 |
 
-## WiFi
+---
 
-Editá `WIFI_SSID`, `WIFI_PASS`, `PI_HOST` (IP de la Pi).
+## Flash
 
-## Pi
+1. IDE → **ESP32 Dev Module**  
+2. Librerías: LiquidCrystal I2C · HX711 · **MFRC522**  
+3. Editá WiFi + `PI_HOST` en `bins_nivel.ino`  
+4. Subí el sketch  
 
-```bash
-bash costa_rica/install_services.sh bins
-journalctl -u sibu-bins -f
+Serial 115200:
+
+```
+RC522 version=0x91 OK
+...
+RFID uid=A7240B9F
+POST rfid → 200 ...
+POST bins → 200
 ```
 
-## Librerías
+Si `version=0x00` / `0xFF`: cableado RC522 o alimentaste con 5 V.
 
-- LiquidCrystal I2C · HX711 (bogde) · Board: **ESP32 Dev Module**
+---
+
+## Pi (sin Arduino)
+
+```bash
+# sibu.env — dejá RFID_SERIAL vacío o comentado (solo HTTP)
+# RFID_PORT=8081
+# BINS_PORT=8082
+
+bash costa_rica/install_services.sh web   # rfid + bins (+ visión)
+# o:
+bash costa_rica/install_services.sh rfid
+bash costa_rica/install_services.sh bins
+
+journalctl -u sibu-rfid-gate -u sibu-bins -f
+```
+
+Prueba RFID sin tarjeta (desde PC/Pi):
+
+```bash
+curl -s -X POST http://IP_PI:8081/api/rfid \
+  -H 'Content-Type: application/json' \
+  -d '{"uid":"A7240B9F"}'
+```
+
+---
+
+## Diagnóstico rápido
+
+| Síntoma | Qué mirar |
+|---|---|
+| `plastico.cm=-1` | HC TRIG/ECHO/VCC |
+| rechazo siempre ~3 cm / rojo | sensor cerca de tapa; calibrá `VACIO_CM` |
+| RC522 `0x00` | 3.3V · SS5 SCK14 MOSI13 MISO23 RST17 |
+| Tap OK en Serial, web no | `sibu-rfid-gate` · `PI_HOST` · puerto **8081** |
+| Bins OK, RFID no | WiFi OK pero POST a 8081; firewall / servicio |
+
+Arduino Uno + RC522 queda como **legado** en `../arduino_rfid/`.

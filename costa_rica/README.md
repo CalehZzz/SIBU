@@ -3,17 +3,18 @@
 ## RFID + botes (Costa Rica)
 
 ```
-Arduino Uno + RC522 --USB Serial--> Pi sibu-rfid-gate  → Firestore unlock
-ESP32 + 2×HC + LCD + HX711 --WiFi--> Pi sibu-bins :8082 → bins_pi/estado
+ESP32 (unificado)
+  ├─ HC + LCD + HX711 ──WiFi──→ Pi :8082 /api/bins
+  └─ RC522 RFID       ──WiFi──→ Pi :8081 /api/rfid
 ```
 
-**Probar ahora (sin PLC):** [`PROBAR_ESP_ARDUINO.md`](PROBAR_ESP_ARDUINO.md)
+**Probar / pines:** [`arduino_bins/README.md`](arduino_bins/README.md) · checklist [`PROBAR_ESP_ARDUINO.md`](PROBAR_ESP_ARDUINO.md)
 
-- RFID: `costa_rica/arduino_rfid/`
-- Botes/báscula demo: `costa_rica/arduino_bins/`
+Arduino USB RFID = **legado** (`arduino_rfid/`). No hace falta si el RC522 está en el ESP.
 
 ```bash
-# sibu.env: RFID_SERIAL=/dev/ttyACM0   BINS_PORT=8082
+# sibu.env: BINS_PORT=8082  RFID_PORT=8081
+# (RFID_SERIAL vacío si usás ESP WiFi)
 bash costa_rica/install_services.sh web
 ```
 
