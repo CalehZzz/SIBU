@@ -84,13 +84,13 @@ const char* PI_HOST   = "192.168.0.20"; // IP de la Pi (ip a / hostname -I)
 const int   PI_PORT   = 8082;
 ```
 
-4. Cableá (mínimo para probar):
-   - HC plástico: TRIG **13** · ECHO **12** · VCC 5V · GND  
+4. Cableá (mínimo para probar) — **pines nuevos**:
+   - HC plástico: TRIG **18** · ECHO **19** · VCC 5V · GND  
    - HC rechazo: TRIG **33** · ECHO **32**  
    - LCD (opcional): SDA **21** · SCL **22** · addr `0x27`  
    - HX711 (opcional): DT **26** · SCK **25**  
 
-5. Flash · Serial Monitor **115200** → debe decir WiFi connected y POSTs.
+5. Flash · Serial **115200**. Si `plastico.cm=-1` o rechazo siempre ~3 cm/rojo → `arduino_bins/README.md`.
 
 ### En la Pi
 
