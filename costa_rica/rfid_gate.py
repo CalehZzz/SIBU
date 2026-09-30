@@ -316,71 +316,89 @@ def main() -> None:
     if args.serial:
         import re
         import threading
+        from pathlib import Path as _Path
 
-        def extract_uid_from_line(line: str) -> str:
-            line = (line or "").strip().strip("\x00").strip()
-            if not line:
-                return ""
-            if line.startswith("{"):
-                try:
-                    u = json.loads(line).get("uid")
-                    return norm_uid(str(u)) if u else ""
-                except Exception:
+        if not _Path(args.serial).exists():
+            print(
+                f"⚠️  RFID_SERIAL={args.serial} no existe — "
+                "modo solo HTTP (ESP32 WiFi). Vaciá RFID_SERIAL= en sibu.env"
+            )
+            sys.stdout.flush()
+            args.serial = ""
+        else:
+
+            def extract_uid_from_line(line: str) -> str:
+                line = (line or "").strip().strip("\x00").strip()
+                if not line:
                     return ""
-            # "UID: A7240B9F" (salida del sketch para el IDE)
-            m = re.match(r"(?i)^UID\s*[:=]\s*([0-9A-Fa-f:.\-\s]+)\s*$", line)
-            if m:
-                return norm_uid(m.group(1))
-            # solo hex
-            u = norm_uid(line)
-            if u and re.fullmatch(r"[0-9A-F]{6,20}", u):
-                return u
-            return ""
+                if line.startswith("{"):
+                    try:
+                        u = json.loads(line).get("uid")
+                        return norm_uid(str(u)) if u else ""
+                    except Exception:
+                        return ""
+                # "UID: A7240B9F" (salida del sketch para el IDE)
+                m = re.match(r"(?i)^UID\s*[:=]\s*([0-9A-Fa-f:.\-\s]+)\s*$", line)
+                if m:
+                    return norm_uid(m.group(1))
+                # solo hex
+                u = norm_uid(line)
+                if u and re.fullmatch(r"[0-9A-F]{6,20}", u):
+                    return u
+                return ""
 
-        def serial_loop() -> None:
-            try:
-                import serial  # type: ignore
-            except ImportError:
-                print("⚠️  pyserial no instalado — ~/SIBU/.venv/bin/pip install pyserial")
-                sys.stdout.flush()
-                return
-            while True:
+            def serial_loop() -> None:
                 try:
-                    ser = serial.Serial(
-                        args.serial,
-                        args.baud,
-                        timeout=1,
-                        write_timeout=1,
-                    )
-                    # dar tiempo al reset del Arduino al abrir el puerto
-                    time.sleep(2.0)
-                    ser.reset_input_buffer()
-                    print(f"✅ RFID Serial abierto {args.serial}")
+                    import serial  # type: ignore
+                except ImportError:
+                    print("⚠️  pyserial no instalado — ~/SIBU/.venv/bin/pip install pyserial")
                     sys.stdout.flush()
-                    while True:
-                        raw = ser.readline()
-                        if not raw:
+                    return
+                while True:
+                    try:
+                        if not _Path(args.serial).exists():
+                            print(
+                                f"⚠️  {args.serial} desapareció — "
+                                "sigo solo HTTP hasta que vuelva el puerto"
+                            )
+                            sys.stdout.flush()
+                            time.sleep(10)
                             continue
-                        line = raw.decode("utf-8", errors="ignore").strip()
-                        if not line:
-                            continue
-                        print(f"SER << {line}")
-                        sys.stdout.flush()
-                        uid = extract_uid_from_line(line)
-                        if not uid:
-                            continue
-                        result = process_card(uid)
-                        print(
-                            f"SER RFID → {result.get('code')} ok={result.get('ok')} "
-                            f"{result.get('error') or result.get('cardUid') or ''}"
+                        ser = serial.Serial(
+                            args.serial,
+                            args.baud,
+                            timeout=1,
+                            write_timeout=1,
                         )
+                        # dar tiempo al reset del Arduino al abrir el puerto
+                        time.sleep(2.0)
+                        ser.reset_input_buffer()
+                        print(f"✅ RFID Serial abierto {args.serial}")
                         sys.stdout.flush()
-                except Exception as e:
-                    print(f"⚠️  serial RFID: {e} — reintento 3s")
-                    sys.stdout.flush()
-                    time.sleep(3)
+                        while True:
+                            raw = ser.readline()
+                            if not raw:
+                                continue
+                            line = raw.decode("utf-8", errors="ignore").strip()
+                            if not line:
+                                continue
+                            print(f"SER << {line}")
+                            sys.stdout.flush()
+                            uid = extract_uid_from_line(line)
+                            if not uid:
+                                continue
+                            result = process_card(uid)
+                            print(
+                                f"SER RFID → {result.get('code')} ok={result.get('ok')} "
+                                f"{result.get('error') or result.get('cardUid') or ''}"
+                            )
+                            sys.stdout.flush()
+                    except Exception as e:
+                        print(f"⚠️  serial RFID: {e} — reintento 3s")
+                        sys.stdout.flush()
+                        time.sleep(3)
 
-        threading.Thread(target=serial_loop, daemon=True).start()
+            threading.Thread(target=serial_loop, daemon=True).start()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt: str, *a) -> None:

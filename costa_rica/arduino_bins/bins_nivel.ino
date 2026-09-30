@@ -64,11 +64,11 @@ HX711 scale;
 //   SCK          GPIO 14
 //   MOSI         GPIO 13
 //   MISO         GPIO 23
-//   RST          GPIO 15   (LED verde desactivado; 16/17 no en tu placa)
+//   RST          GPIO 27   (15 es strapping → SW_RESET raros; 16/17 no en tu placa)
 //   3.3V         3.3V      (NUNCA 5V)
 //   GND          GND
 #define RFID_SS   5
-#define RFID_RST  15
+#define RFID_RST  27
 #define RFID_SCK  14
 #define RFID_MOSI 13
 #define RFID_MISO 23
@@ -78,9 +78,9 @@ unsigned long lastTapMs = 0;
 unsigned long lcdUidUntilMs = 0;
 String lcdUidMsg = "";
 
-// Salidas PLC / LEDs opcionales (-1 = off). GPIO 5 = SDA/SS RFID · 15 = RST
+// Salidas PLC / LEDs opcionales (-1 = off). GPIO 5 = SDA/SS · 27 = RST
 const int OUT_FULL_P = -1;
-const int OUT_FULL_R = 27;
+const int OUT_FULL_R = -1;
 const int LED_YELLOW = 4;
 const int LED_RED    = 2;
 const int LED_GREEN  = -1;
@@ -259,9 +259,9 @@ void tickBins() {
   if (stopAll) lamp = "red";
   else if (divertP) lamp = "yellow";
 
-  digitalWrite(LED_RED, stopAll ? HIGH : LOW);
-  digitalWrite(LED_YELLOW, divertP ? HIGH : LOW);
-  digitalWrite(LED_GREEN, (!stopAll && !divertP) ? HIGH : LOW);
+  if (LED_RED >= 0) digitalWrite(LED_RED, stopAll ? HIGH : LOW);
+  if (LED_YELLOW >= 0) digitalWrite(LED_YELLOW, divertP ? HIGH : LOW);
+  if (LED_GREEN >= 0) digitalWrite(LED_GREEN, (!stopAll && !divertP) ? HIGH : LOW);
 
   pintarLcd();
   publicarBins(lamp, stopAll);
@@ -278,9 +278,9 @@ void setup() {
   }
   if (OUT_FULL_P >= 0) pinMode(OUT_FULL_P, OUTPUT);
   if (OUT_FULL_R >= 0) pinMode(OUT_FULL_R, OUTPUT);
-  pinMode(LED_YELLOW, OUTPUT);
-  pinMode(LED_RED, OUTPUT);
-  pinMode(LED_GREEN, OUTPUT);
+  if (LED_YELLOW >= 0) pinMode(LED_YELLOW, OUTPUT);
+  if (LED_RED >= 0) pinMode(LED_RED, OUTPUT);
+  if (LED_GREEN >= 0) pinMode(LED_GREEN, OUTPUT);
 
   Wire.begin();
   lcd.init();
@@ -302,7 +302,7 @@ void setup() {
   Serial.printf("RC522 version=0x%02X %s\n", v,
                 (v == 0x00 || v == 0xFF) ? "FAIL SPI/3.3V" : "OK");
 
-  Serial.println("HC P:18/19  R:33/32 | HX711:26/25 | RFID SDA/SS=5 SCK14 MOSI13 MISO23 RST16");
+  Serial.println("HC P:18/19  R:33/32 | HX711:26/25 | RFID SDA/SS=5 SCK14 MOSI13 MISO23 RST15");
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);

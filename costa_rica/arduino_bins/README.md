@@ -47,7 +47,7 @@ En el módulo el pin suele decir **SDA** (a veces NSS/SS). Es el **chip-select S
 | SCK | **14** | |
 | MOSI | **13** | |
 | MISO | **23** | |
-| RST / RESET | **15** | |
+| RST / RESET | **27** | no uses 15 (strapping → resets) |
 | 3.3V | **3.3V** | nunca 5 V |
 | GND | GND | |
 
@@ -67,7 +67,7 @@ DT **26** · SCK **25**
 | Full rechazo | 27 (opcional) |
 | LED amarillo | 4 |
 | LED rojo | **2** (GPIO 5 = SDA/SS del RC522) |
-| LED verde | 15 |
+| LED verde | off (GPIO 15 = RST RFID) |
 
 ---
 
