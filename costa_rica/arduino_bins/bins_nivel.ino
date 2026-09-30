@@ -64,11 +64,11 @@ HX711 scale;
 //   SCK          GPIO 14
 //   MOSI         GPIO 13
 //   MISO         GPIO 23
-//   RST          GPIO 16   (si tu placa no trae 16, usá 27 y soltá OUT_FULL_R)
+//   RST          GPIO 15   (LED verde desactivado; 16/17 no en tu placa)
 //   3.3V         3.3V      (NUNCA 5V)
 //   GND          GND
 #define RFID_SS   5
-#define RFID_RST  16
+#define RFID_RST  15
 #define RFID_SCK  14
 #define RFID_MOSI 13
 #define RFID_MISO 23
@@ -78,12 +78,12 @@ unsigned long lastTapMs = 0;
 unsigned long lcdUidUntilMs = 0;
 String lcdUidMsg = "";
 
-// Salidas PLC opcionales (-1 = desactivado). LEDs: rojo no en GPIO 5 (= SS RFID)
+// Salidas PLC / LEDs opcionales (-1 = off). GPIO 5 = SDA/SS RFID · 15 = RST
 const int OUT_FULL_P = -1;
 const int OUT_FULL_R = 27;
 const int LED_YELLOW = 4;
 const int LED_RED    = 2;
-const int LED_GREEN  = 15;
+const int LED_GREEN  = -1;
 
 float lastCm[2] = {NAN, NAN};
 int   lastPct[2] = {0, 0};
@@ -244,8 +244,8 @@ void tickBins() {
     delay(20);
     pollRfid();
   }
-  digitalWrite(OUT_FULL_P, lleno[0] ? HIGH : LOW);
-  digitalWrite(OUT_FULL_R, lleno[1] ? HIGH : LOW);
+  if (OUT_FULL_P >= 0) digitalWrite(OUT_FULL_P, lleno[0] ? HIGH : LOW);
+  if (OUT_FULL_R >= 0) digitalWrite(OUT_FULL_R, lleno[1] ? HIGH : LOW);
 
   if (scale.is_ready()) {
     float g = scale.get_units(8);
@@ -276,8 +276,8 @@ void setup() {
     pinMode(ECHO[i], INPUT);
     digitalWrite(TRIG[i], LOW);
   }
-  pinMode(OUT_FULL_P, OUTPUT);
-  pinMode(OUT_FULL_R, OUTPUT);
+  if (OUT_FULL_P >= 0) pinMode(OUT_FULL_P, OUTPUT);
+  if (OUT_FULL_R >= 0) pinMode(OUT_FULL_R, OUTPUT);
   pinMode(LED_YELLOW, OUTPUT);
   pinMode(LED_RED, OUTPUT);
   pinMode(LED_GREEN, OUTPUT);
@@ -302,7 +302,7 @@ void setup() {
   Serial.printf("RC522 version=0x%02X %s\n", v,
                 (v == 0x00 || v == 0xFF) ? "FAIL SPI/3.3V" : "OK");
 
-  Serial.println("HC P:18/19  R:33/32 | HX711:26/25 | RFID SS5 SCK14 MOSI13 MISO23 RST17");
+  Serial.println("HC P:18/19  R:33/32 | HX711:26/25 | RFID SDA/SS=5 SCK14 MOSI13 MISO23 RST16");
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);

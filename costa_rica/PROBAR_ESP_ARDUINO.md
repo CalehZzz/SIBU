@@ -36,7 +36,7 @@ journalctl -u sibu-rfid-gate -u sibu-bins -f
 |---|---|
 | HC plástico | TRIG **18** ECHO **19** |
 | HC rechazo | TRIG **33** ECHO **32** |
-| RC522 | **SDA/SS → 5** · SCK **14** · MOSI **13** · MISO **23** · RST **16** · **3.3V** |
+| RC522 | **SDA/SS → 5** · SCK **14** · MOSI **13** · MISO **23** · RST **15** · **3.3V** |
 | LCD | SDA **21** SCL **22** |
 | HX711 | DT **26** SCK **25** |
 
