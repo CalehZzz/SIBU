@@ -39,15 +39,17 @@ VCC → 5 V · GND común.
 
 ### RC522 (RFID) — **3.3 V nada más**
 
-| RC522 | ESP32 |
-|---|---|
-| SDA / SS | **5** |
-| SCK | **14** |
-| MOSI | **13** |
-| MISO | **23** |
-| RST | **17** |
-| 3.3V | **3.3V** |
-| GND | GND |
+En el módulo el pin suele decir **SDA** (a veces NSS/SS). Es el **chip-select SPI**, no I2C: va a GPIO **5**, no al 21 del LCD.
+
+| RC522 (serigrafía) | ESP32 | Nota |
+|---|---|---|
+| **SDA** / SS / NSS | **5** | chip select |
+| SCK | **14** | |
+| MOSI | **13** | |
+| MISO | **23** | |
+| RST / RESET | **16** | si no tenés 16 en la placa → **27** |
+| 3.3V | **3.3V** | nunca 5 V |
+| GND | GND | |
 
 ### LCD I2C
 

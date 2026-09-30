@@ -57,16 +57,18 @@ float HX_SCALE = 420.0f;
 HX711 scale;
 
 // ===== RC522 (SPI propio — no choca con HC 18/19 ni LCD 21/22) =====
-//   RC522     ESP32
-//   SDA/SS    GPIO 5
-//   SCK       GPIO 14
-//   MOSI      GPIO 13
-//   MISO      GPIO 23
-//   RST       GPIO 17
-//   3.3V      3.3V   (NUNCA 5V)
-//   GND       GND
+// En el módulo RC522 el pin se llama SDA / NSS / SS → es el chip-select SPI
+// (NO es I2C; no va a GPIO 21).
+//   RC522        ESP32
+//   SDA / SS     GPIO 5
+//   SCK          GPIO 14
+//   MOSI         GPIO 13
+//   MISO         GPIO 23
+//   RST          GPIO 16   (si tu placa no trae 16, usá 27 y soltá OUT_FULL_R)
+//   3.3V         3.3V      (NUNCA 5V)
+//   GND          GND
 #define RFID_SS   5
-#define RFID_RST  17
+#define RFID_RST  16
 #define RFID_SCK  14
 #define RFID_MOSI 13
 #define RFID_MISO 23
@@ -76,8 +78,8 @@ unsigned long lastTapMs = 0;
 unsigned long lcdUidUntilMs = 0;
 String lcdUidMsg = "";
 
-// Salidas opcionales / LEDs (LED rojo ya no en GPIO 5 = SS RFID)
-const int OUT_FULL_P = 16;
+// Salidas PLC opcionales (-1 = desactivado). LEDs: rojo no en GPIO 5 (= SS RFID)
+const int OUT_FULL_P = -1;
 const int OUT_FULL_R = 27;
 const int LED_YELLOW = 4;
 const int LED_RED    = 2;
