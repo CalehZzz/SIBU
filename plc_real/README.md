@@ -20,6 +20,8 @@ Página SIBU / HMI web  (Start, Stop, manual, emergencia…)
 
 Visión / Costa Rica: carpeta [`costa_rica/`](../costa_rica/).
 
+**Guía desde cero (compañera):** [`docs/14_GUIA_COMPANERA_TIA_DESDE_CERO.md`](../docs/14_GUIA_COMPANERA_TIA_DESDE_CERO.md)
+
 | Modo | Carpeta | CPU | Qué hay en mesa |
 |---|---|---|---|
 | Demo / sim | `tia/` + HMI 🖥️ | 1511C PLCSIM | 3 pistones sim (sin FC) |
