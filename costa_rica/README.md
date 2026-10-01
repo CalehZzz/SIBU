@@ -68,7 +68,7 @@ systemctl status sibu-vision-firebase
 journalctl -u sibu-vision-firebase -f
 ```
 
-## PLC (TIA desde cero · 1214C)
+## PLC (TIA desde cero · 1215C `6ES7 215-1HG40-0XB0` V4.5)
 
 Ver `plc_real/00_PROYECTO_TIA.md` · `NETWORKS_LAD.md` · `CHECKLIST.md`.
 

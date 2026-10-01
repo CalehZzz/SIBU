@@ -1,18 +1,23 @@
-# Crear proyecto TIA — CPU 1214C AC/DC/Rly (PLC real · 3 pistones)
+# Crear proyecto TIA — CPU 1215C DC/DC/DC (PLC real · 3 pistones)
 
-El proyecto de **PLCSIM 1511C no sirve** como device del 1214C.  
-Crea un proyecto nuevo.
+**Hardware de mesa:** `6ES7 215-1HG40-0XB0` · **CPU 1215C DC/DC/DC** · FW **V4.5**  
+(ver `CPU.md`)
+
+El proyecto de **PLCSIM 1511C no sirve** como device de esta CPU.  
+Crea un proyecto nuevo con el **MLFB exacto**.
 
 ## 1) Proyecto nuevo
-1. TIA Portal V20 → Create new project (ej. `SIBU_PLC_Real_1214C`)
-2. Add new device → **S7-1200** → **CPU 1214C AC/DC/Rly**  
-   (elige el MLFB exacto de tu CPU, ej. `6ES7 214-1BG40-0XB0` o el que tengas)
-3. Firmware: el de tu CPU física
+1. TIA Portal V20 → Create new project (ej. `SIBU_PLC_Real_1215C`)
+2. Add new device → **S7-1200** → **CPU 1215C DC/DC/DC**  
+   → MLFB **`6ES7 215-1HG40-0XB0`** (o el de la etiqueta si difiere)
+3. Firmware: **V4.5** (el de tu CPU física)
+
+> No elijas 1214C ni AC/DC/Rly: las salidas de esta CPU son **transistor 24 V**, no relé interno.
 
 ## 2) Red / IP
 1. Device configuration → PROFINET interface [X1]
-2. IP estática en la misma red que tu PC (ej. `192.168.0.10` / mask `255.255.255.0`)
-3. Anota esa IP para el bridge
+2. IP estática en la misma red que la Pi (ej. `192.168.0.1` o `192.168.0.10` / mask `255.255.255.0`)
+3. Anota esa IP para el bridge (`PLC_IP` en `costa_rica/sibu.env`)
 
 ## 3) Protección (obligatorio para snap7)
 Device → CPU → **Protection & Security**:
@@ -41,23 +46,23 @@ Crea (mismos nombres que en sim, distinta lógica de I/O):
 Estructura: `DB_CONTRATO_WEB.md` (incluye `Piston1On`/`Piston2On`/`Piston3On` @ 17.x).
 
 ## 6) Tag table
-Copia `TABLA_IO_1214C.md` — **6 solenoides** (Ext/Ret) + banda + **3 relés** · **5 DI** material · **sin** FC de pistón.  
-Cablea **1L y 2L a +24 V**; el 220 V del semáforo solo en contactos de relé.
+Copia `TABLA_IO_1214C.md` — **6 solenoides** (Ext/Ret) + banda + **3 salidas a relés externos** · DI material / botes · **sin** FC de pistón.  
+`%Q` = 24 V DC → bobinas de relé / solenoides 24 V; el 220 V del semáforo solo en contactos de relé.
 
 ## 7) Download
 1. CPU en STOP o RUN-P según política
 2. Download hardware + software
 3. RUN
-4. Online: verifica DBs y I/Q
 
-## Diferencia clave vs simulación
+## 8) Bridge
+```bash
+py plc_real/plc_bridge_real.py --ip <IP_DE_ESTA_CPU>
+```
 
-| | Sim (1511C) | Real (1214C) |
+Estación Firestore: `colegio-don-bosco-real`.
+
+| | Sim (1511C) | Real (1215C) |
 |---|---|---|
-| Sensores | `DB_HMI.Sensor*` | **`I_Sensor*`** (pieza / vías) — **sin** FC pistón |
-| Peso | simulado en HMI | báscula solo al **final** (demo); **no** espera peso para clasificar |
-| Pistones | `M_PistonN` + Ext/Ret · TON | **6 × `Q_PistonNExt/Ret`** · ciclo por tiempo |
-| Semáforo | `M_Lampara*` | `Q_Lampara*` → **relés** → 220 V |
-| Roles | Tres cilindros sim | P1 plástico · P2 latas · P3 vidrio |
-| Operador (Start/Stop/manual…) | `DB_HMI` | **solo `DB_HMI`** (sin pulsadores físicos) |
-| AS / KEP | no | no |
+| Device | PLCSIM Advanced | `6ES7 215-1HG40-0XB0` |
+| I/O | `%M` / AS / KEP | `%I` / `%Q` físicos |
+| Estación web | `parque-central` | `colegio-don-bosco-real` |

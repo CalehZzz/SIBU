@@ -20,7 +20,7 @@ Dos demos, **mismo cerebro Siemens**. No mezcles IPs ni proyectos TIA.
 │                                                             │
 │  Mesa: banda + 3 pistones + sensores + contadores           │
 │        ↕ I/Q cableados                                      │
-│  CPU 1214C (proyecto TIA aparte: plc_real/)                 │
+│  CPU 1215C (proyecto TIA aparte: plc_real/)                 │
 │        ↕ snap7 (LAN)                                        │
 │  Raspberry Pi 4                                             │
 │    ├─ plc_bridge_real.py  → Firestore → web                 │
@@ -69,7 +69,7 @@ Guías: `docs/02_GUIA_AUTOMATION_STUDIO.md` · `tia/KEPSERVER_AS_MAPEO.md` · `d
 
 ## DEMO B — Encender en este orden (mesa Costa Rica)
 
-Proyecto TIA **distinto**: `plc_real/` · CPU **1214C**.
+Proyecto TIA **distinto**: `plc_real/` · CPU **1215C** (`6ES7 215-1HG40-0XB0` V4.5).
 
 ### 1) Cableado + PLC
 1. I/Q según `plc_real/TABLA_IO_1214C.md`.

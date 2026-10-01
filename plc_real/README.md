@@ -1,10 +1,12 @@
-# SIBU — PLC real (S7-1200 CPU 1214C AC/DC/Rly · 3 pistones)
+# SIBU — PLC real (S7-1200 CPU 1215C DC/DC/DC · 3 pistones)
+
+**CPU de mesa:** `6ES7 215-1HG40-0XB0` · **1215C DC/DC/DC** · FW **V4.5** → [`CPU.md`](CPU.md)
 
 Proyecto **aparte** del de simulación (1511C + PLCSIM).  
-No reutilices el hardware config del 1511C: crea un proyecto TIA nuevo con CPU **1214C**.
+No reutilices el hardware config del 1511C: crea un proyecto TIA nuevo con el **MLFB exacto**.
 
 **Actuadores neumáticos (real):** 3 cilindros **doble efecto** — P1 plástico · P2 latas · P3 vidrio · **6 solenoides** (Ext/Ret) · **sin** FC de posición.  
-**Semáforo:** 3 relés 24 V (`Q_Lampara*`) → lámparas 220 V. Comunes **1L y 2L → 24 V**.  
+**Semáforo:** `%Q` 24 V (transistor) → **relés externos** → lámparas 220 V.  
 **Operador de mesa:** HMI web (plus). En sim: AS + KEP. Ver [`docs/13_CONECTAR_TODO.md`](../docs/13_CONECTAR_TODO.md).
 
 ```
@@ -13,8 +15,8 @@ Página SIBU / HMI web  (Start, Stop, manual, emergencia…)
    Raspberry Pi 4
         ├─ plc_bridge_real.py  (HMI ↔ PLC ↔ web)
         └─ costa_rica/vision_gemini.py  (cámara → Gemini → VisionMaterial)
-        ↕ snap7  (IP del 1214C)
-   CPU 1214C + 3 sensores POSICIÓN + banda + 6 solenoides + 3 relés
+        ↕ snap7  (IP del 1215C)
+   CPU 1215C + 3 sensores POSICIÓN + banda + 6 solenoides + relés externos
    Latch: VisionMaterial==N AND I_Sensor vía N → paro banda + pistón
 ```
 
@@ -25,7 +27,7 @@ Visión / Costa Rica: carpeta [`costa_rica/`](../costa_rica/).
 | Modo | Carpeta | CPU | Qué hay en mesa |
 |---|---|---|---|
 | Demo / sim | `tia/` + HMI 🖥️ | 1511C PLCSIM | 3 pistones sim (sin FC) |
-| **PLC real** | **`plc_real/`** | **1214C** | Sensores material + **6 Q pistones** + relés; mando solo web |
+| **PLC real** | **`plc_real/`** | **1215C** (`215-1HG40`) | Sensores + **6 Q pistones** + relés; mando solo web |
 
 ---
 
@@ -33,8 +35,9 @@ Visión / Costa Rica: carpeta [`costa_rica/`](../costa_rica/).
 
 | Archivo | Contenido |
 |---|---|
+| `CPU.md` | MLFB / FW / notas DC/DC/DC |
 | `00_PROYECTO_TIA.md` | Crear proyecto desde cero en TIA V20 |
-| `TABLA_IO_1214C.md` | Asignación `%I` / `%Q` / `%M` / DBs |
+| `TABLA_IO_1214C.md` | Asignación `%I` / `%Q` / `%M` / DBs (nombre histórico) |
 | `NETWORKS_LAD.md` | Networks FC (bloques) |
 | `DB_CONTRATO_WEB.md` | `DatosEstacion` + `DB_HMI` (mismo contrato web) |
 | `plc_bridge_real.py` | Bridge con defaults para PLC real |
@@ -48,10 +51,33 @@ Visión / Costa Rica: carpeta [`costa_rica/`](../costa_rica/).
 py plc_real/plc_bridge_real.py
 ```
 
-o:
+Sustituye la IP por la del 1215C (`PLC_IP`).
 
-```powershell
-py plc_bridge.py colegio-don-bosco-real --ip 192.168.0.10 --db 1 --db-hmi 3
-```
+---
 
-Sustituye `192.168.0.10` por la IP del 1214C.
+## Plan B — bridge en tu PC (sin Pi)
+
+Misma web (Firestore) · bridge en la laptop · Ethernet al 1215C.
+
+1. **Pará el bridge de la Pi** (si no, pelean por el PLC / la estación):
+   ```bash
+   sudo systemctl stop sibu-bridge
+   ```
+2. Cable Ethernet PC ↔ switch/PLC. IP del PC en la misma subnet que el PLC  
+   (ej. PLC `192.168.0.1` → PC `192.168.0.100` / mask `255.255.255.0`).
+3. En TIA: PUT/GET ON · DBs Optimized OFF · CPU **RUN** · online OK.
+4. En la PC (PowerShell), desde la raíz del repo:
+   ```powershell
+   git pull
+   pip install firebase-admin python-snap7
+   # serviceAccountKey.json debe estar en la raíz del repo
+   py plc_real/plc_bridge_real.py --ip 192.168.0.1 --pulse-hold 2.0
+   ```
+   Usá la IP real del 1215C (la de TIA / etiqueta).
+5. Log bueno:
+   - `✅ PLC conectado`
+   - `👂 Escuchando hmi_comandos…`
+   - Al START en la web: `HMI←FS(snap) pulse Start=1` → `On=1`
+6. Web: **🔌 → Abrir HMI (modo real)** · estación `colegio-don-bosco-real` · **START**.
+
+Si `ping` al PLC falla, el bridge no arranca. Si ping OK pero snap7 falla → PUT/GET / firewall / IP distinta.

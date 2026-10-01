@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-SIBU — Bridge PLC REAL (S7-1200 CPU 1214C AC/DC/Rly)
+SIBU — Bridge PLC REAL (S7-1200 CPU 1215C DC/DC/DC)
+
+Hardware: 6ES7 215-1HG40-0XB0 · FW V4.5 (ver plc_real/CPU.md)
 
 Mismos DBs que el demo (DatosEstacion=DB1, DB_HMI=DB3), distinta estación Firestore
-y distinta IP (la del 1214C en la red, no PLCSIM).
+y distinta IP (la del 1215C en la red, no PLCSIM).
 
   py plc_real/plc_bridge_real.py
-  py plc_real/plc_bridge_real.py --ip 192.168.0.10
+  py plc_real/plc_bridge_real.py --ip 192.168.0.1
 
 Requiere serviceAccountKey.json en la raíz del repo.
 Docs: plc_real/README.md
@@ -22,7 +24,7 @@ sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 
 DEFAULT_ESTACION = "colegio-don-bosco-real"
-DEFAULT_IP = "192.168.0.10"
+DEFAULT_IP = "192.168.0.1"
 
 
 def _inject_defaults(argv: list[str]) -> list[str]:
@@ -39,7 +41,7 @@ def _inject_defaults(argv: list[str]) -> list[str]:
 
 if __name__ == "__main__":
     sys.argv = _inject_defaults(sys.argv)
-    print("=== SIBU bridge · PLC REAL 1214C ===")
+    print("=== SIBU bridge · PLC REAL 1215C (6ES7 215-1HG40-0XB0 V4.5) ===")
     print(f"CWD={ROOT}")
     print(f"Args: {' '.join(sys.argv[1:])}")
     print("Sensores/actuadores: I/Q físicos · 3 pistones (ver plc_real/NETWORKS_LAD.md)\n")

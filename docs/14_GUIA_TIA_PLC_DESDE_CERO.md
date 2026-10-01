@@ -1,4 +1,4 @@
-# Guía desde CERO — TIA Portal + PLC 1214C + que funcione todo
+# Guía desde CERO — TIA Portal + PLC 1215C (`6ES7 215-1HG40-0XB0` V4.5) + que funcione todo
 
 **Meta:** proyecto TIA nuevo → ladder completo → download al PLC → ciclo real + web.  
 **Carpeta del repo:** `plc_real/` (PLC **físico**; no uses el proyecto de simulación 1511C).
@@ -21,7 +21,7 @@ El ESP32 manda niveles de botes (y RFID) por WiFi a la Pi.
 
 | Pieza | Rol | ¿Se hace en TIA? |
 |---|---|---|
-| TIA + CPU 1214C | Lógica LAD | **Sí — es el núcleo** |
+| TIA + CPU 1215C | Lógica LAD | **Sí — es el núcleo** |
 | DBs `DatosEstacion` + `DB_HMI` | Contrato con la web/Pi | **Sí** |
 | Raspberry Pi + bridge | Web ↔ PLC | Después del ladder |
 | Gemini | Material 1/2/3/4 | Después |
@@ -37,7 +37,7 @@ El ESP32 manda niveles de botes (y RFID) por WiFi a la Pi.
 
 - PC con **TIA Portal V20**
 - Cable Ethernet PC ↔ switch/PLC (misma red)
-- CPU **S7-1200 1214C** (anotá el MLFB de la etiqueta, ej. `6ES7 214-1BG40-0XB0`)
+- CPU **S7-1200 1215C DC/DC/DC** — MLFB de mesa: **`6ES7 215-1HG40-0XB0`** · FW **V4.5** (ver `plc_real/CPU.md`)
 - 24 V DC para sensores/actuadores (según mesa)
 - Repo SIBU clonado (para copiar tablas): carpeta `plc_real/`
 
@@ -77,7 +77,8 @@ Ejemplo típico Costa Rica:
 
 1. **Add new device**.  
 2. Controllers → **SIMATIC S7-1200**.  
-3. Elegí **CPU 1214C AC/DC/Rly** (o DC/DC/DC si es la tuya — **debe coincidir con la etiqueta física**).  
+3. Elegí **CPU 1215C DC/DC/DC** · MLFB **`6ES7 215-1HG40-0XB0`** · FW **V4.5**.  
+   (Si la etiqueta difiere, usá el MLFB físico — **no** 1214C ni AC/DC/Rly.)  
 4. Firmware: el más cercano al de tu CPU (Online → Accessible devices lo muestra).  
 5. Add.
 
