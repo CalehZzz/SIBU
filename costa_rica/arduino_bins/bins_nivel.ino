@@ -53,20 +53,22 @@ LiquidCrystal_I2C lcd(LCD_ADDR, 16, 2);
 
 // ===== HX711 — módulo "Load Cell Amplifier" / "Load Cell Amp HX711" =====
 // Cara lógica (al ESP32):
-//   VCC     → 5V del ESP (en este módulo conviene 5V, no 3V3)
-//   GND     → GND
-//   DT/DOUT → GPIO 26
-//   SCK     → GPIO 25   (a veces dice PD_SCK)
-// Cara celda (load cell, 4 hilos):
-//   E+ / RED    · E− / BLK
-//   A+ / GRN    · A− / WHT   (si raw no se mueve, probá swap A+/A−)
-// No uses el canal B (B+/B−) salvo celdas especiales.
+//   VCC → 3V3  (si tu placa no tiene pin 5V; VIN/5V solo si existe y hay USB)
+//   GND → GND
+//   DT / DOUT → GPIO 26
+//   SCK / PD_SCK → GPIO 25
+// Celda de carga (4 hilos — colores típicos):
+//   ROJO   → E+   (excitación +)
+//   NEGRO  → E−   (excitación −)
+//   BLANCO → A−   (señal −)   ⎫ canal A del HX711
+//   VERDE  → A+   (señal +)   ⎭ si raw no se mueve, intercambiá blanco↔verde
+//   (algunas celdas traen amarillo = shield → GND del HX711)
+// B+ / B− del módulo: no conectar.
 const int HX_DT  = 26;  // DT / DOUT del HX711
 const int HX_SCK = 25;  // SCK / PD_SCK del HX711
 // Calibración (gramos): 1) vacío → tare al boot
 // 2) poné peso conocido (ej. 100 g)  3) mirá Serial "HX raw=…" / "units="
-// 4) HX_SCALE = |raw_con_peso - raw_vacio| / gramos
-//    o bien: HX_SCALE = HX_SCALE * units / 100  si units≠100 con 100 g
+// 4) HX_SCALE = HX_SCALE * units / 100  si units≠100 con 100 g
 float HX_SCALE = 420.0f;
 HX711 scale;
 bool hxOk = false;

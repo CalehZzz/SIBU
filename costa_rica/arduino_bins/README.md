@@ -57,23 +57,32 @@ SDA **21** · SCL **22** · addr `0x27`
 
 ### HX711 — módulo **Load Cell Amp / Load Cell Amplifier**
 
-Es el amplificador verde/azul con bornes a un lado y pines al otro. El sketch ya apunta a ese módulo (librería HX711 + canal A).
-
 ```
 Load cell (4 hilos) → [ E+ E− A− A+ ] HX711 [ VCC DT SCK GND ] → ESP32
 ```
 
+#### Colores de la celda (lo habitual)
+
+| Cable celda | Borne HX711 | Qué es |
+|---|---|---|
+| **Rojo** | **E+** | excitación + |
+| **Negro** | **E−** | excitación − |
+| **Verde** | **A+** | señal + |
+| **Blanco** | **A−** | señal − |
+
+Verde y blanco son la **señal diferencial** (no son VCC/GND). Si `raw` no cambia al cargar, **intercambiá verde ↔ blanco**.
+
+#### ESP sin pin 5V
+
+**No estás regado.** Alimentá el HX711 con **3V3** del ESP (el chip aguanta 2.6–5.5 V). La señal es un poco más débil; calibrá `HX_SCALE` igual.
+
 | Serigrafía HX711 | Va a |
 |---|---|
-| **VCC** | **5V** ESP |
+| **VCC** | **3V3** (o **VIN**/5V si tu placa lo trae y está alimentada por USB) |
 | **GND** | GND |
-| **DT** o DOUT | GPIO **26** |
-| **SCK** o PD_SCK | GPIO **25** |
-| **E+** | rojo celda |
-| **E−** | negro |
-| **A+** | verde (o blanco; según celda) |
-| **A−** | blanco (o verde) |
-| B+ / B− | no conectar (canal B) |
+| **DT** / DOUT | GPIO **26** |
+| **SCK** / PD_SCK | GPIO **25** |
+| B+ / B− | no conectar |
 
 ### Si `pesoKg` siempre 0.0000
 
