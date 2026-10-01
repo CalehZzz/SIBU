@@ -19,7 +19,7 @@ Gemini (visión) escribe solo VisionMaterial en DB_HMI.
 El ESP32 manda niveles de botes (y RFID) por WiFi a la Pi.
 ```
 
-| Pieza | Rol | ¿Lo hace ella en TIA? |
+| Pieza | Rol | ¿Se hace en TIA? |
 |---|---|---|
 | TIA + CPU 1214C | Lógica LAD | **Sí — es el núcleo** |
 | DBs `DatosEstacion` + `DB_HMI` | Contrato con la web/Pi | **Sí** |
