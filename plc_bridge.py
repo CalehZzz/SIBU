@@ -496,6 +496,23 @@ def main() -> None:
                 f"3={int(st.get('piston3', False))})"
                 + (" FIN" if payload["finalizada"] else "")
             )
+            # Start llega a DB3 pero el LAD no arma → banda/manual nunca salen
+            if (
+                not st["sistemaOn"]
+                and (
+                    _pulse_hold_until.get("Start", 0) > time.monotonic()
+                    or bool(latest_cmd.get("Start"))
+                )
+            ):
+                _warn_once(
+                    "start_no_on",
+                    "⚠️  Start=1 en DB_HMI pero DatosEstacion.SistemaOn sigue 0.\n"
+                    "   → En TIA Online abrí DB3: ¿DB_HMI.Start parpadea en 1?\n"
+                    "   → FC_Modos debe tener: DB_HMI.Start —|/| Stop —|/| Emerg —(S) M_SistemaOn\n"
+                    "   → FC_EspejoWeb: DatosEstacion.SistemaOn := M_SistemaOn\n"
+                    "   → Download software otra vez. Sin On=1 la banda Manual no enciende.",
+                    remind_s=15.0,
+                )
 
             if not args.dry_run and sesion_ref is not None:
                 fs_body = {

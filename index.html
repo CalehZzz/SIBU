@@ -2991,10 +2991,15 @@ function updateTripleMachineStage(prefix, plc){
 }
 
 function syncRealPistonCmdUi(plc){
+  // Preferí comando HMI local (si no, la UI “rechaza” Marcha porque PLC aún On=0)
+  const p1 = !!(hmiCmd.ManualPiston1 || plc.piston1);
+  const p2 = !!(hmiCmd.ManualPiston2 || plc.piston2);
+  const p3 = !!(hmiCmd.ManualPiston || plc.piston3);
+  const bandaCmd = !!(hmiCmd.ManualBanda || plc.banda);
   const rows = [
-    { info: "hmi-p1-info", st: "hmi-p1-cmd-st", on: !!plc.piston1, ext: "hmi-p1-extend", ret: "hmi-p1-retract" },
-    { info: "hmi-p2-info", st: "hmi-p2-cmd-st", on: !!plc.piston2, ext: "hmi-p2-extend", ret: "hmi-p2-retract" },
-    { info: "hmi-p3-info", st: "hmi-p3-cmd-st", on: !!plc.piston3, ext: "hmi-p3-extend", ret: "hmi-p3-retract" },
+    { info: "hmi-p1-info", st: "hmi-p1-cmd-st", on: p1, ext: "hmi-p1-extend", ret: "hmi-p1-retract" },
+    { info: "hmi-p2-info", st: "hmi-p2-cmd-st", on: p2, ext: "hmi-p2-extend", ret: "hmi-p2-retract" },
+    { info: "hmi-p3-info", st: "hmi-p3-cmd-st", on: p3, ext: "hmi-p3-extend", ret: "hmi-p3-retract" },
   ];
   for(const r of rows){
     $(r.info)?.classList.toggle("out", r.on);
@@ -3002,10 +3007,16 @@ function syncRealPistonCmdUi(plc){
     $(r.ext)?.classList.toggle("active-cmd", r.on);
     $(r.ret)?.classList.toggle("active-cmd", !r.on);
   }
-  $("hmi-banda-info")?.classList.toggle("out", !!plc.banda);
-  if($("hmi-banda-cmd-st")) $("hmi-banda-cmd-st").textContent = plc.banda ? "Marcha" : "Parada";
-  $("hmi-banda-on")?.classList.toggle("active-cmd", !!plc.banda);
-  $("hmi-banda-off")?.classList.toggle("active-cmd", !plc.banda);
+  $("hmi-banda-info")?.classList.toggle("out", bandaCmd);
+  if($("hmi-banda-cmd-st")){
+    if(hmiCmd.ManualBanda && !plc.banda){
+      $("hmi-banda-cmd-st").textContent = plc.sistemaOn ? "Cmd ON (PLC off)" : "Cmd ON · falta START en PLC";
+    }else{
+      $("hmi-banda-cmd-st").textContent = bandaCmd ? "Marcha" : "Parada";
+    }
+  }
+  $("hmi-banda-on")?.classList.toggle("active-cmd", !!hmiCmd.ManualBanda);
+  $("hmi-banda-off")?.classList.toggle("active-cmd", !hmiCmd.ManualBanda);
 }
 
 /** Manual/banda/pistón en LAD exigen M_SistemaOn y /ModoAuto. */
