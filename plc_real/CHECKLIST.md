@@ -48,3 +48,17 @@
 5. Emergencia → paro + limpia visión
 6. **No** hay paso “esperar báscula lista” antes de clasificar
 7. Verificar que el **contador de mesa** incrementó (no solo el número en la web)
+
+## Si HMI conecta pero las luces/Q no cambian
+
+Orden en HMI: **Quit. E** → **START** → selector en **Manual** → **Marcha** / **Extender P1**.
+
+| Síntoma | Causa típica |
+|---|---|
+| START no pone Sistema ON en web | Falta red Set `M_SistemaOn` en `FC_Modos`, o `Emergencia=1` en `DB_HMI` |
+| Sistema ON pero luz verde apagada | Cable/`1L`/`2L`, o roja/amarilla activas (¿`I_BinFull*` en 1 sin cablear?) |
+| Manual banda/P1 no mueve LED de Q | Falta rama Manual en LAD (ver `NETWORKS_LAD.md` NW2 / NW9) o `M_StopBotes` |
+| Bridge log `On=0` siempre | START no llega / Stop o Emerg retenidos |
+| Bridge log `On=1 B=0` con ManualBanda=1 | LAD no copia `ManualBanda` → `Q_Banda`, o Auto sigue en 1 |
+
+Log útil del bridge: `On=… Auto=… Em=… Al=… B=… P=(1=…2=…3=…)`.

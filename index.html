@@ -2991,7 +2991,23 @@ function syncRealPistonCmdUi(plc){
   $("hmi-banda-off")?.classList.toggle("active-cmd", !plc.banda);
 }
 
+/** Manual/banda/pistón en LAD exigen M_SistemaOn y /ModoAuto. */
+function ensureSistemaOnForActuators(){
+  if(hmiCmd.Emergencia){
+    pushHmiCmd({ Emergencia: false }, { immediate: true });
+    toast("Quité emergencia", { soft: true });
+  }
+  const sist = ($("hmi-sistema")?.textContent || "").toUpperCase();
+  if(sist === "OFF" || sist === "—"){
+    pulseHmi("Start", 1200);
+    toast("START (hace falta para luces/actuadores)", { soft: true });
+    return false;
+  }
+  return true;
+}
+
 function setPistonExtend(which, extend){
+  if(extend) ensureSistemaOnForActuators();
   const patch = { ModoAuto: false };
   if(which === 1) patch.ManualPiston1 = !!extend;
   else if(which === 2) patch.ManualPiston2 = !!extend;
@@ -3007,17 +3023,10 @@ function setPistonExtend(which, extend){
   });
   if($("hmi-p" + which)) $("hmi-p" + which).textContent = pistonPosLabel(!!extend);
   $("hmi-chip-p" + which)?.classList.toggle("ok", !!extend);
-
-  // Solo aviso suave si hace falta START (manual suele exigir SistemaOn)
-  if(extend){
-    const sist = ($("hmi-sistema")?.textContent || "").toUpperCase();
-    if(sist === "OFF" || sist === "—"){
-      toast("Dale START si no se mueve", { soft: true });
-    }
-  }
 }
 
 function setBandaManual(on){
+  if(on) ensureSistemaOnForActuators();
   pushHmiCmd({ ModoAuto: false, ManualBanda: !!on });
   syncHmiToggleUi();
   syncRealPistonCmdUi({
@@ -3045,13 +3054,18 @@ function renderHmiFromPlc(data){
     bar.classList.remove("ok", "warn", "fault");
     if(plc.emergencia){
       bar.classList.add("fault");
-      if(alarmTxt) alarmTxt.textContent = "EMERGENCIA ACTIVA — máquina detenida";
+      if(alarmTxt) alarmTxt.textContent = "EMERGENCIA — pulsá Quit. E y luego START";
     }else if(plc.alarma){
       bar.classList.add("warn");
-      if(alarmTxt) alarmTxt.textContent = "ALARMA ACTIVA — reset requerido";
+      if(alarmTxt) alarmTxt.textContent = "ALARMA ACTIVA — Reset (¿bote rechazo lleno?)";
+    }else if(connected && !plc.sistemaOn){
+      bar.classList.add("warn");
+      if(alarmTxt) alarmTxt.textContent = "Sistema OFF — pulsá START (luego Manual + banda/P1)";
     }else if(connected){
       bar.classList.add("ok");
-      if(alarmTxt) alarmTxt.textContent = "Sistema listo — sin alarmas";
+      if(alarmTxt) alarmTxt.textContent = plc.modoAuto
+        ? "AUTO listo — banda debería correr si no hay alarma"
+        : "MANUAL — usá Marcha / Extender para Q del PLC";
     }else{
       bar.classList.add("ok");
       if(alarmTxt) alarmTxt.textContent = "Sin enlace PLC / bridge";
@@ -3100,8 +3114,11 @@ function ensureHmiListen(){
 }
 
 $("hmi-start").onclick = () => {
-  pulseHmi("Start", 1000);
-  toast("START", { soft: true });
+  if(hmiCmd.Emergencia){
+    pushHmiCmd({ Emergencia: false }, { immediate: true });
+  }
+  pulseHmi("Start", 1200);
+  toast("START → luz verde si LAD + 1L/2L OK", { soft: true });
 };
 $("hmi-stop").onclick = () => {
   pulseHmi("Stop", 1000);

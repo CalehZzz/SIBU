@@ -438,7 +438,14 @@ def main() -> None:
             print(
                 f"→ P:{m['plastico']['piezas']}/{m['plastico']['pesoKg']:.3f} "
                 f"A:{m['aluminio']['piezas']}/{m['aluminio']['pesoKg']:.3f} "
-                f"{st['estado']} B={int(st['banda'])} P={int(st['piston'])}"
+                f"{st['estado']} "
+                f"On={int(st['sistemaOn'])} Auto={int(st['modoAuto'])} "
+                f"Em={int(st['emergencia'])} Al={int(st['alarma'])} "
+                f"B={int(st['banda'])} "
+                f"P={int(st['piston'])}"
+                f"(1={int(st.get('piston1', False))}"
+                f"2={int(st.get('piston2', False))}"
+                f"3={int(st.get('piston3', False))})"
                 + (" FIN" if payload["finalizada"] else "")
             )
 
