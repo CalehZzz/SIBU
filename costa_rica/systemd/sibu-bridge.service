@@ -8,8 +8,8 @@ Type=simple
 User=sibucr
 WorkingDirectory=/home/sibucr/SIBU
 EnvironmentFile=-/home/sibucr/SIBU/costa_rica/sibu.env
-# --interval 1.0 = menos lecturas Firestore; solo escribe si cambian datos
-ExecStart=/home/sibucr/SIBU/.venv/bin/python plc_real/plc_bridge_real.py --ip ${PLC_IP} --interval 1.0
+# --interval 1.0 = menos writes a sesiones; HMI usa on_snapshot (no depende del intervalo)
+ExecStart=/home/sibucr/SIBU/.venv/bin/python plc_real/plc_bridge_real.py --ip ${PLC_IP} --interval 1.0 --pulse-hold 2.0
 Restart=on-failure
 RestartSec=10
 

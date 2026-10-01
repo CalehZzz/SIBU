@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import threading
 import time
 
 import firebase_admin
@@ -378,35 +379,82 @@ def main() -> None:
     # Reafirma plc.conectado aunque el resto del payload no cambie
     # (la web a veces abría sesión pisando conectado=false).
     HEARTBEAT_S = 5.0
+
+    # HMI: on_snapshot (no polling) — si no, el pulso Start de ~1s
+    # se pierde entre lecturas del bridge a --interval 1.0.
+    latest_cmd: dict = {}
+    cmd_lock = threading.Lock()
+    cmd_dirty = threading.Event()
+    cmd_watch = None
+
+    def _ingest_cmd(data: dict | None, *, source: str) -> None:
+        nonlocal latest_cmd
+        with cmd_lock:
+            latest_cmd = dict(data or {})
+        cmd_dirty.set()
+        c = latest_cmd
+        if any(c.get(k) for k in ("Start", "Stop", "ResetAlarma", "FinSesion")):
+            print(
+                f"   HMI←FS({source}) pulse "
+                f"Start={int(bool(c.get('Start')))} "
+                f"Stop={int(bool(c.get('Stop')))} "
+                f"Reset={int(bool(c.get('ResetAlarma')))} "
+                f"Fin={int(bool(c.get('FinSesion')))}"
+            )
+        mp1 = bool(c.get("ManualPiston1"))
+        mp2 = bool(c.get("ManualPiston2"))
+        mp3 = bool(c.get("ManualPiston"))
+        if mp1 or mp2 or mp3 or not bool(c.get("ModoAuto", True)):
+            print(
+                f"   HMI←FS({source}) Manual P1={int(mp1)} P2={int(mp2)} P3={int(mp3)} "
+                f"Auto={int(bool(c.get('ModoAuto')))} "
+                f"BandaMan={int(bool(c.get('ManualBanda')))}"
+            )
+
+    def _on_hmi_cmd(doc_snapshot, changes, read_time) -> None:  # noqa: ARG001
+        try:
+            snap = doc_snapshot[0] if isinstance(doc_snapshot, (list, tuple)) else doc_snapshot
+            if snap is None:
+                return
+            exists = bool(getattr(snap, "exists", False))
+            data = snap.to_dict() if exists else {}
+            _ingest_cmd(data, source="snap")
+        except Exception as e:
+            _warn_once("hmi_snap_err", f"⚠️  HMI on_snapshot: {e}")
+
+    if not args.dry_run and cmd_ref is not None:
+        try:
+            seed = cmd_ref.get()
+            if seed.exists:
+                _ingest_cmd(seed.to_dict() or {}, source="seed")
+            cmd_watch = cmd_ref.on_snapshot(_on_hmi_cmd)
+            print("👂 Escuchando hmi_comandos en vivo (on_snapshot)")
+        except Exception as e:
+            print(f"⚠️  on_snapshot HMI falló ({e}) — fallback a get() en el loop")
+            cmd_watch = None
+
     try:
         while True:
-            # 1) HMI web → PLC
+            # 1) HMI web → PLC (snapshot en vivo + retención de pulsos)
             if not args.dry_run and not args.no_hmi_write and cmd_ref is not None:
                 try:
-                    snap = cmd_ref.get()
-                    if snap.exists:
-                        cmd = snap.to_dict() or {}
-                        cmd_plc = aplicar_retencion_pulsos(cmd, args.pulse_hold)
-                        escribir_db_hmi(plc, args.db_hmi, cmd_plc)
-                        # Diagnóstico pulsos Start/Stop
-                        if any(cmd_plc.get(k) for k in ("Start", "Stop", "ResetAlarma", "FinSesion")):
-                            print(
-                                f"   HMI→DB3 pulse "
-                                f"Start={int(bool(cmd_plc.get('Start')))} "
-                                f"Stop={int(bool(cmd_plc.get('Stop')))} "
-                                f"Reset={int(bool(cmd_plc.get('ResetAlarma')))} "
-                                f"Fin={int(bool(cmd_plc.get('FinSesion')))}"
-                            )
-                        # Diagnóstico pistones manuales (P1/P2/P3)
-                        mp1 = bool(cmd.get("ManualPiston1"))
-                        mp2 = bool(cmd.get("ManualPiston2"))
-                        mp3 = bool(cmd.get("ManualPiston"))
-                        if mp1 or mp2 or mp3 or not bool(cmd.get("ModoAuto", True)):
-                            print(
-                                f"   HMI→DB3 Manual P1={int(mp1)} P2={int(mp2)} P3={int(mp3)} "
-                                f"Auto={int(bool(cmd.get('ModoAuto')))} "
-                                f"BandaMan={int(bool(cmd.get('ManualBanda')))}"
-                            )
+                    if cmd_watch is None:
+                        snap = cmd_ref.get()
+                        if snap.exists:
+                            _ingest_cmd(snap.to_dict() or {}, source="poll")
+                    with cmd_lock:
+                        cmd = dict(latest_cmd)
+                    # Siempre escribir: la retención de Start/Stop vive en el loop
+                    cmd_plc = aplicar_retencion_pulsos(cmd, args.pulse_hold)
+                    escribir_db_hmi(plc, args.db_hmi, cmd_plc)
+                    if any(cmd_plc.get(k) for k in ("Start", "Stop", "ResetAlarma", "FinSesion")):
+                        print(
+                            f"   HMI→DB3 pulse "
+                            f"Start={int(bool(cmd_plc.get('Start')))} "
+                            f"Stop={int(bool(cmd_plc.get('Stop')))} "
+                            f"Reset={int(bool(cmd_plc.get('ResetAlarma')))} "
+                            f"Fin={int(bool(cmd_plc.get('FinSesion')))}"
+                        )
                 except Exception as e:
                     _warn_once("write_hmi_err", f"⚠️  escritura DB_HMI: {e}")
 
@@ -429,7 +477,7 @@ def main() -> None:
                         last_fs_write = 0.0
                     except Exception as e2:
                         _warn_once("fs_offline_err", f"⚠️  Firestore offline flag: {e2}")
-                # PLC caído: no martillar Firestore (cada ciclo hace cmd_ref.get)
+                # PLC caído: no martillar Firestore
                 time.sleep(max(5.0, args.interval * 5))
                 continue
 
@@ -469,10 +517,17 @@ def main() -> None:
             if payload["finalizada"]:
                 print("\n✅ FinSesion en PLC.")
                 break
-            time.sleep(args.interval)
+            # Despertar al instante si llega un comando HMI nuevo
+            cmd_dirty.wait(timeout=max(0.05, args.interval))
+            cmd_dirty.clear()
     except KeyboardInterrupt:
         print("\nStop.")
     finally:
+        if cmd_watch is not None:
+            try:
+                cmd_watch.unsubscribe()
+            except Exception:
+                pass
         try:
             plc.disconnect()
         except Exception:
