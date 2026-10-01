@@ -5,6 +5,9 @@
  * WiFi: bins → :8082/api/bins · RFID → :8081/api/rfid
  *
  * Librerías: LiquidCrystal I2C · HX711 (bogde) · MFRC522
+ *
+ * Báscula: si ves HX? a veces = WiFi pisa el HX711 un instante (ya no borra el último kg).
+ * Kg altísimos con HX_SCALE=1.0 = normal (son cuentas, no gramos). Calibrá SCALE.
  */
 
 #include <Wire.h>
@@ -22,7 +25,7 @@ const char* PI_HOST   = "172.20.10.3";
 const int   PI_BINS   = 8082;
 const int   PI_RFID   = 8081;
 
-const bool DEBUG_HC = false;  // true solo si depurás ultrasonidos
+const bool DEBUG_HC = false;
 const bool DEBUG_HX = true;
 const bool DEMO_NO_STOP = false;
 
@@ -38,20 +41,21 @@ const float MAX_CM = 400.0f;
 const uint8_t LCD_ADDR = 0x27;
 LiquidCrystal_I2C lcd(LCD_ADDR, 16, 2);
 
-// ===== HX711 Load Cell Amp =====
-// VCC→3V3 (o VIN) · GND · DT→26 · SCK→25
+// ===== HX711 =====
+// VCC→3V3 · GND · DT→26 · SCK→25
 // Celda: ROJO E+ · NEGRO E− · VERDE A+ · BLANCO A−
 const int HX_DT  = 26;
 const int HX_SCK = 25;
-// true si al poner peso el raw BAJA (invertí A+/A− o poné true)
 const bool HX_INVERT = false;
-// Peso conocido para el asistente de calibración (gramos)
 const float HX_CAL_GRAMS = 100.0f;
-// Empezá con 1.0f: units ≈ (raw-tare). Luego ajustá con la fórmula del Serial.
+// IMPORTANTE: después de calibrar poné el valor que te diga el Serial
+// (ej. 420.0). Con 1.0 el LCD muestra cuentas/1000 → kg inventados altos.
 float HX_SCALE = 1.0f;
 HX711 scale;
 bool hxOk = false;
+int  hxFailStreak = 0;
 long hxTareRaw = 0;
+long hxLastDelta = 0;
 
 // ===== RC522 =====
 // SDA/SS→5 · SCK→14 · MOSI→13 · MISO→23 · RST→27 · 3.3V
@@ -68,8 +72,6 @@ String lcdUidMsg = "";
 unsigned long lastRfidKickMs = 0;
 bool rfidOk = false;
 
-const int OUT_FULL_P = -1;
-const int OUT_FULL_R = -1;
 const int LED_YELLOW = 4;
 const int LED_RED    = 2;
 const int LED_GREEN  = -1;
@@ -80,6 +82,7 @@ bool  lleno[2] = {false, false};
 bool  sensorOk[2] = {false, false};
 float lastKg = 0.0f;
 unsigned long lastBinsMs = 0;
+unsigned long lastHxMs = 0;
 
 float leerCm(int i, unsigned long* usOut) {
   digitalWrite(TRIG[i], LOW);
@@ -124,9 +127,17 @@ void pintarLcd() {
   lcd.print(l0);
   lcd.setCursor(0, 1);
   char l1[17];
-  if (!sensorOk[1]) snprintf(l1, sizeof(l1), "R:FAIL         ");
-  else if (!hxOk) snprintf(l1, sizeof(l1), "HX?  R:%3d%%   ", lastPct[1]);
-  else snprintf(l1, sizeof(l1), "%5.3fkg R:%3d%%  ", lastKg, lastPct[1]);
+  if (!sensorOk[1]) {
+    snprintf(l1, sizeof(l1), "R:FAIL         ");
+  } else if (!hxOk && hxFailStreak > 8) {
+    // Solo HX? si falló varias veces seguidas (no un glitch de WiFi)
+    snprintf(l1, sizeof(l1), "HX?  R:%3d%%   ", lastPct[1]);
+  } else if (HX_SCALE <= 1.01f) {
+    // Sin calibrar: mostrá delta crudo (cuentas), no "kg"
+    snprintf(l1, sizeof(l1), "d:%5ld R:%3d%%", hxLastDelta, lastPct[1]);
+  } else {
+    snprintf(l1, sizeof(l1), "%5.3fkg R:%3d%%  ", lastKg, lastPct[1]);
+  }
   lcd.print(l1);
 }
 
@@ -141,7 +152,6 @@ String uidToHex(MFRC522::Uid uid) {
 }
 
 void rfidBusReady() {
-  // Reclama el SPI del RC522 (por si quedó raro tras WiFi/HTTP)
   SPI.begin(RFID_SCK, RFID_MISO, RFID_MOSI, RFID_SS);
   pinMode(RFID_SS, OUTPUT);
   digitalWrite(RFID_SS, HIGH);
@@ -176,19 +186,14 @@ bool postRfid(const String& uid) {
   String resp = http.getString();
   Serial.printf("POST rfid → %d %s\n", code, resp.c_str());
   http.end();
-  rfidBusReady();  // SPI otra vez después de WiFi
+  rfidBusReady();
   return code >= 200 && code < 300;
 }
 
 void pollRfid() {
-  // Cada ~7 s re-init (el RC522 a veces “se muda” con WiFi)
-  if (millis() - lastRfidKickMs > 7000UL) {
-    rfidKick();
-  }
-
+  if (millis() - lastRfidKickMs > 7000UL) rfidKick();
   rfidBusReady();
 
-  // Quirk MFRC522: a veces hace falta 2º intento de IsNewCardPresent
   bool present = mfrc522.PICC_IsNewCardPresent();
   if (!present) present = mfrc522.PICC_IsNewCardPresent();
   if (!present) return;
@@ -200,7 +205,6 @@ void pollRfid() {
   digitalWrite(RFID_SS, HIGH);
 
   unsigned long now = millis();
-  // Debounce corto — sacar y volver a acercar la tarjeta
   if (uid == lastUid && (now - lastTapMs) < 1200UL) return;
   lastUid = uid;
   lastTapMs = now;
@@ -212,39 +216,81 @@ void pollRfid() {
   postRfid(uid);
 }
 
-void leerBascula() {
-  if (!scale.is_ready()) {
-    hxOk = false;
-    if (DEBUG_HX) Serial.println("HX not ready");
-    return;
+bool hxWaitReady(unsigned long timeoutMs) {
+  unsigned long t0 = millis();
+  while (millis() - t0 < timeoutMs) {
+    if (scale.is_ready()) return true;
+    delay(1);
   }
-  hxOk = true;
+  return scale.is_ready();
+}
 
-  // Promedio estable (raw)
-  long sum = 0;
-  const int N = 8;
-  int nOk = 0;
-  for (int i = 0; i < N; i++) {
-    if (!scale.is_ready()) {
-      delay(2);
-      continue;
-    }
-    sum += scale.read();
-    nOk++;
-    delay(2);
-  }
-  if (nOk < 3) {
-    hxOk = false;
+void leerBascula() {
+  // No leer HX en cada tick si acabamos de leer (deja respirar al WiFi/SPI)
+  if (millis() - lastHxMs < 300UL && hxOk) return;
+  lastHxMs = millis();
+
+  scale.power_up();
+  if (!hxWaitReady(80)) {
+    hxFailStreak++;
+    // NO apagues hxOk de una: mantené el último kg en LCD
+    if (hxFailStreak > 8) hxOk = false;
+    if (DEBUG_HX) Serial.printf("HX skip (not ready) streak=%d — se mantiene kg=%.4f\n", hxFailStreak, lastKg);
     return;
   }
-  long raw = sum / nOk;
+
+  // 5 lecturas, descartá min/max (filtro simple de picos)
+  long vals[5];
+  int n = 0;
+  for (int i = 0; i < 5; i++) {
+    if (!hxWaitReady(40)) continue;
+    vals[n++] = scale.read();
+    delay(3);
+  }
+  if (n < 3) {
+    hxFailStreak++;
+    if (hxFailStreak > 8) hxOk = false;
+    if (DEBUG_HX) Serial.println("HX pocas muestras");
+    return;
+  }
+
+  // bubble sort chico
+  for (int i = 0; i < n - 1; i++) {
+    for (int j = i + 1; j < n; j++) {
+      if (vals[j] < vals[i]) {
+        long t = vals[i];
+        vals[i] = vals[j];
+        vals[j] = t;
+      }
+    }
+  }
+  long raw = vals[n / 2];  // mediana
   long delta = raw - hxTareRaw;
   if (HX_INVERT) delta = -delta;
 
-  // Con HX_SCALE=1 → units ≈ delta (cuentas). Después de calibrar = gramos.
+  // Rechazar picos absurdos vs lectura anterior (ruido / glitch)
+  if (hxOk && hxLastDelta != 0) {
+    long jump = delta - hxLastDelta;
+    if (jump < 0) jump = -jump;
+    // si SCALE aún es 1, delta es grande; umbral en cuentas ~ 2e6
+    if (jump > 2000000L) {
+      if (DEBUG_HX) Serial.printf("HX pico ignorado delta=%ld (prev=%ld)\n", delta, hxLastDelta);
+      return;
+    }
+  }
+
+  hxFailStreak = 0;
+  hxOk = true;
+  hxLastDelta = delta;
+
   float units = (float)delta / HX_SCALE;
-  if (units < 0 && units > -2.0f) units = 0;  // ruido chico
+  if (units < 0 && units > -5.0f) units = 0;
   if (units < 0) units = 0;
+  // Tope demo: más de 50 kg con SCALE calibrado = basura
+  if (HX_SCALE > 1.01f && units > 50000.0f) {
+    if (DEBUG_HX) Serial.printf("HX units absurdas %.1f — ignore\n", units);
+    return;
+  }
   lastKg = units / 1000.0f;
 
   if (DEBUG_HX) {
@@ -252,15 +298,13 @@ void leerBascula() {
       "HX raw=%ld tare=%ld delta=%ld  → %.1f (SCALE=%.3f)  kg=%.4f\n",
       raw, hxTareRaw, delta, units, HX_SCALE, lastKg
     );
-    // Ayuda: si |delta| < 200 con 100 g encima → montaje 3D / celda no carga
     long ad = delta < 0 ? -delta : delta;
     if (ad < 200) {
-      Serial.println("HX aviso: delta casi 0 con peso → la fuerza NO llega a la celda");
-      Serial.println("  (plataforma toca paredes, tornillos traban ambos lados, o celda mal sujeta)");
+      Serial.println("HX aviso: delta~0 → montaje 3D no carga la celda");
     } else if (HX_SCALE <= 1.01f) {
       Serial.printf(
-        "HX calib: con %.0fg poné  HX_SCALE = |delta|/%.0f  → ej. %.1f\n",
-        HX_CAL_GRAMS, HX_CAL_GRAMS, (float)ad / HX_CAL_GRAMS
+        "HX calib: con %.0fg →  HX_SCALE = %ld / %.0f  = %.1f\n",
+        HX_CAL_GRAMS, ad, HX_CAL_GRAMS, (float)ad / HX_CAL_GRAMS
       );
     }
   }
@@ -302,11 +346,10 @@ void publicarBins(const char* lamp, bool stopAll) {
 }
 
 void tickBins() {
-  const char* nombre[2] = {"plastico", "rechazo"};
   for (int i = 0; i < 2; i++) {
     unsigned long us1 = 0, us2 = 0;
     float cm = leerCm(i, &us1);
-    delay(20);
+    delay(15);
     pollRfid();
     float cm2 = leerCm(i, &us2);
     if (!isnan(cm) && !isnan(cm2)) cm = (cm + cm2) / 2.0f;
@@ -316,14 +359,6 @@ void tickBins() {
     sensorOk[i] = !isnan(cm);
     lastPct[i] = cmToPct(i, cm);
     lleno[i] = sensorOk[i] && (lastPct[i] >= LLENO_PCT);
-
-    if (DEBUG_HC) {
-      if (sensorOk[i]) {
-        Serial.printf("HC%d %-8s cm=%.1f pct=%d\n", i, nombre[i], cm, lastPct[i]);
-      } else {
-        Serial.printf("HC%d %-8s FAIL\n", i, nombre[i]);
-      }
-    }
     pollRfid();
   }
 
@@ -338,7 +373,6 @@ void tickBins() {
 
   if (LED_RED >= 0) digitalWrite(LED_RED, stopAll ? HIGH : LOW);
   if (LED_YELLOW >= 0) digitalWrite(LED_YELLOW, divertP ? HIGH : LOW);
-  if (LED_GREEN >= 0) digitalWrite(LED_GREEN, (!stopAll && !divertP) ? HIGH : LOW);
 
   pintarLcd();
   publicarBins(lamp, stopAll);
@@ -366,36 +400,43 @@ void setup() {
   lcd.setCursor(0, 1);
   lcd.print("HC+HX+RFID");
 
-  // --- HX711 primero (bit-bang; no usa SPI HW) ---
   scale.begin(HX_DT, HX_SCK);
-  delay(300);
+  delay(400);
   scale.set_gain(128);
+  scale.power_up();
   Serial.print("HX711 wait");
   hxOk = false;
-  for (int i = 0; i < 60; i++) {
+  for (int i = 0; i < 80; i++) {
     if (scale.is_ready()) { hxOk = true; break; }
     Serial.print(".");
     delay(50);
   }
   Serial.println();
   if (!hxOk) {
-    Serial.println("HX711 FAIL — VCC 3V3/VIN · DT26 · SCK25 · GND · celda E/A");
+    Serial.println("HX711 FAIL — VCC 3V3 · DT26 · SCK25 · GND");
   } else {
-    // Tara en RAW (sin scale inventado)
-    scale.set_scale(1.0f);
-    delay(100);
-    hxTareRaw = scale.read_average(20);
-    scale.set_scale(HX_SCALE);
+    delay(200);
+    // Promedio de tara más largo = más estable
+    long sum = 0;
+    int n = 0;
+    for (int i = 0; i < 30; i++) {
+      if (hxWaitReady(100)) {
+        sum += scale.read();
+        n++;
+      }
+      delay(5);
+    }
+    hxTareRaw = (n > 0) ? (sum / n) : 0;
+    hxLastDelta = 0;
+    hxFailStreak = 0;
     Serial.printf("HX711 OK tare_raw=%ld  HX_SCALE=%.3f\n", hxTareRaw, HX_SCALE);
-    Serial.println("Vacío al boot. Poné peso conocido y mirá delta=");
-    Serial.println("Si delta~0 → montaje 3D no carga la celda.");
-    Serial.printf("Si delta grande: HX_SCALE = |delta| / %.0f  (gramos)\n", HX_CAL_GRAMS);
+    Serial.println("LCD sin calibrar muestra d:##### (delta), no kg.");
+    Serial.printf("Con %.0fg: HX_SCALE = |delta|/%.0f  luego re-flash\n", HX_CAL_GRAMS, HX_CAL_GRAMS);
   }
 
-  // --- RC522 ---
   rfidKick();
-  if (rfidOk) Serial.println("RC522 OK — acercá tarjeta (sacala y volvé a acercar)");
-  else Serial.println("RC522 FAIL — 3.3V SDA5 SCK14 MOSI13 MISO23 RST27");
+  if (rfidOk) Serial.println("RC522 OK — sacá y acercá tarjeta");
+  else Serial.println("RC522 FAIL");
 
   Serial.println("Pines: HC 18/19 33/32 | HX 26/25 | RFID 5/14/13/23/27");
 
@@ -410,20 +451,36 @@ void setup() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.print("IP ");
     Serial.println(WiFi.localIP());
-    Serial.printf("Pi %s  bins:%d rfid:%d\n", PI_HOST, PI_BINS, PI_RFID);
+    Serial.printf("Pi %s bins:%d rfid:%d\n", PI_HOST, PI_BINS, PI_RFID);
   } else {
     Serial.println("WiFi FAIL");
   }
 
-  // WiFi a veces tumba SPI → re-init RFID
   rfidKick();
+  // Retara DESPUÉS del WiFi (el consumo cambia un poco el offset)
+  if (hxOk) {
+    delay(300);
+    long sum = 0;
+    int n = 0;
+    for (int i = 0; i < 20; i++) {
+      if (hxWaitReady(80)) {
+        sum += scale.read();
+        n++;
+      }
+      delay(5);
+    }
+    if (n > 5) {
+      hxTareRaw = sum / n;
+      Serial.printf("HX retara post-WiFi tare_raw=%ld\n", hxTareRaw);
+    }
+  }
   Serial.println("SIBU listo");
 }
 
 void loop() {
   pollRfid();
   unsigned long now = millis();
-  if (now - lastBinsMs >= 500UL) {
+  if (now - lastBinsMs >= 550UL) {
     lastBinsMs = now;
     tickBins();
   }
