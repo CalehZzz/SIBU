@@ -8,7 +8,7 @@ App web + puente al PLC Siemens (TIA Portal / PLCSIM) + guías para Automation S
 Mapa: [`docs/12_RUBRICA_CAPAS.md`](docs/12_RUBRICA_CAPAS.md) · arquitectura: [`docs/10_ARQUITECTURA_FINAL.md`](docs/10_ARQUITECTURA_FINAL.md).
 
 TIA V20 · CPU **1511C-1 PN** (demo AS/KEP) · PLCSIM Advanced **V7** · AS 10 · KEP 6.  
-PLC real: CPU **1214C** → carpeta [`plc_real/`](plc_real/).  
+PLC real: CPU **1215C** (`6ES7 215-1HG40-0XB0` V4.5) → carpeta [`plc_real/`](plc_real/).  
 HMI usable + app = web (plus); atajo lab sin AS: [`docs/11_SIN_AS_SOLO_WEB.md`](docs/11_SIN_AS_SOLO_WEB.md).
 
 1. [`docs/12_RUBRICA_CAPAS.md`](docs/12_RUBRICA_CAPAS.md) — **qué es obligatorio vs plus**  
@@ -29,7 +29,7 @@ python plc_bridge.py parque-central --ip 192.168.0.1 --db 1 --db-hmi 3
 
 En la app: conectar estación → **Abrir HMI** · **🔌** = panel PLC real · **🏠** = estaciones.
 
-### PLC real (S7-1200 1214C) — carpeta aparte
+### PLC real (S7-1200 1215C DC/DC/DC) — carpeta aparte
 
 **No uses el proyecto TIA del 1511C.** Todo está en [`plc_real/`](plc_real/README.md):
 

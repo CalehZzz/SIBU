@@ -1,26 +1,26 @@
-# Checklist — PLC real 1214C + visión Gemini + web (Pi 4)
+# Checklist — PLC real 1215C (`6ES7 215-1HG40-0XB0` V4.5) + visión Gemini + web (Pi 4)
 
 ## Hardware / TIA
-- [ ] Proyecto **nuevo** con CPU 1214C (no el de 1511C)
-- [ ] IP estática anotada (ej. `192.168.0.10`)
+- [ ] Proyecto **nuevo** con CPU **1215C DC/DC/DC** MLFB `6ES7 215-1HG40-0XB0` FW **V4.5** (no 1511C, no 1214C)
+- [ ] IP estática anotada (ej. `192.168.0.1` / `192.168.0.10`)
 - [ ] PUT/GET habilitado + download hardware
 - [ ] `DatosEstacion` DB1 Optimized OFF · **≥ 28 bytes**
 - [ ] `DB_HMI` DB3 Optimized OFF · **≥ 8 bytes**
   - ManualPiston1/2 @1.4/1.5 · SensorVidrio @1.6 · PesoActualKg @2.0
   - **`VisionMaterial` Int @ 6.0** (0/1/2/3/4)
-- [ ] Tag table según `TABLA_IO_1214C.md` (**5 DI** + **10 DQ**)
+- [ ] Tag table según `TABLA_IO_1214C.md` (**DI** + **10 DQ** transistor 24 V)
   - `I_SensorPieza` = entrada (foto); **no** paro por peso
   - `I_BasculaFinal` (`I0.4`) = báscula al **final** (demo); **no** gatea
 - [ ] **4× HC-SR04** (Arduino) → botes P/A/V/Rechazo · ver `costa_rica/arduino_bins/`
 - [ ] DI `I_BinFull*` cableadas (o Merker desde `bins_pi`)
-- [ ] Lámpara amarilla = material lleno (desvío) · roja = rechazo lleno (stop)
+- [ ] Lámpara amarilla = material lleno (desvío) · roja = rechazo lleno (stop) · vía **relés externos** si 220 V
 - [ ] **3 contadores FÍSICOS** cableados a `Q_ContPlastico/Aluminio/Vidrio`
 - [ ] LAD según `NETWORKS_LAD.md`:
   - banda **sigue** tras entrada; solo para en clasif/pistón
   - latch = **VisionMaterial == N AND I_Sensor…**
   - Al terminar TON: **pulso contador físico** + `VisionMaterial := 0`
 - [ ] `T_TimeoutVision` (ej. 8 s) si hay entrada sin visión → Vision=4
-- [ ] **1L y 2L** al mismo **+24 V**
+- [ ] Alimentación de salidas **24 V** correcta (DC/DC/DC · no es AC/DC/Rly)
 - [ ] Download software + CPU RUN
 - [ ] Online: forzando Ext/Ret de cada pistón se oye/ve cada solenoide
 
@@ -56,7 +56,7 @@ Orden en HMI: **Quit. E** → **START** → selector en **Manual** → **Marcha*
 | Síntoma | Causa típica |
 |---|---|
 | START no pone Sistema ON en web | Falta red Set `M_SistemaOn` en `FC_Modos`, o `Emergencia=1` en `DB_HMI` |
-| Sistema ON pero luz verde apagada | Cable/`1L`/`2L`, o roja/amarilla activas (¿`I_BinFull*` en 1 sin cablear?) |
+| Sistema ON pero luz verde apagada | Cable/24 V, o roja/amarilla activas (¿`I_BinFull*` en 1 sin cablear?) |
 | Manual banda/P1 no mueve LED de Q | Falta rama Manual en LAD (ver `NETWORKS_LAD.md` NW2 / NW9) o `M_StopBotes` |
 | Bridge log `On=0` siempre | START no llega / Stop o Emerg retenidos |
 | Bridge log `On=1 B=0` con ManualBanda=1 | LAD no copia `ManualBanda` → `Q_Banda`, o Auto sigue en 1 |

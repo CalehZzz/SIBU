@@ -1,6 +1,10 @@
-# I/O — CPU 1214C (pistones + botes HC-SR04 + contadores físicos)
+# I/O — CPU 1215C DC/DC/DC (`6ES7 215-1HG40-0XB0` V4.5)
+
+> Nombre de archivo histórico (`TABLA_IO_1214C`). Hardware real: ver `CPU.md`.
 
 Operador de mesa: **HMI web** (plus del equipo). Rúbrica: **AS (sim) + TIA + este físico**. Mesa: sensores de vía + banda + 3 pistones + **4 botes con HC-SR04** + contadores físicos + semáforo.
+
+**Salidas:** transistor **24 V DC** (no relé en la CPU). Lámparas 220 V → relés externos.
 
 ```
   Entrada → foto Gemini (banda sigue)
@@ -29,7 +33,8 @@ Ver `NETWORKS_LAD.md` · Arduino: `costa_rica/arduino_bins/`.
 | `%I0.7` | `I_BinFullVidrio` | Arduino OUT full V | Bote vidrio lleno |
 | `%I1.0` | `I_BinFullRechazo` | Arduino OUT full R | Bote rechazo lleno → **stop** |
 
-> Si no cableás DI, el bridge puede escribir Merker `M_BinFull*` desde Firestore `bins_pi/estado`.
+> Si no cableás DI, el bridge puede escribir Merker `M_BinFull*` desde Firestore `bins_pi/estado`.  
+> Esta CPU tiene **14 DI** — sobran entradas para futuros sensores.
 
 ---
 

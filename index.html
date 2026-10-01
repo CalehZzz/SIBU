@@ -1718,17 +1718,17 @@
         <div id="history-list"></div>
       </section>
 
-      <!-- ---------- PLC REAL (1214C) ---------- -->
+      <!-- ---------- PLC REAL (1215C) ---------- -->
       <section id="view-plc-real" class="hidden">
         <div class="greeting">
-          <h2>PLC real · 1214C</h2>
+          <h2>PLC real · 1215C</h2>
           <p>Proyecto TIA aparte (`plc_real/`). 3 pistones doble efecto (6 solenoides) + relés semáforo · mando 100 % desde esta web.</p>
         </div>
 
         <div class="card real-card">
           <div class="section-title">Arquitectura</div>
           <p style="font-size:14px; color:var(--forest-soft); line-height:1.5; margin:0 0 12px;">
-            Web ⇄ Firestore ⇄ <span class="mono">plc_bridge_real.py</span> ⇄ CPU <b>1214C AC/DC/Rly</b> (`%I` / `%Q`)
+            Web ⇄ Firestore ⇄ <span class="mono">plc_bridge_real.py</span> ⇄ CPU <b>1215C DC/DC/DC</b> (`6ES7 215-1HG40-0XB0` V4.5)
           </p>
           <div class="plc-grid">
             <div class="plc-chip">Estación Firestore <b id="real-estacion-id">colegio-don-bosco-real</b></div>
@@ -1742,7 +1742,7 @@
           <div class="section-title">Bridge en tu PC (misma red que el PLC)</div>
           <pre class="real-cmd mono" id="real-bridge-cmd">py plc_real/plc_bridge_real.py --ip 192.168.0.10</pre>
           <div class="field" style="margin-top:12px;">
-            <label>IP del 1214C</label>
+            <label>IP del 1215C</label>
             <input type="text" id="real-plc-ip" value="192.168.0.10" autocomplete="off">
           </div>
           <button class="btn btn-outline" id="btn-copy-real-cmd" type="button">Copiar comando</button>
@@ -1752,7 +1752,7 @@
           <div class="section-title">Estado en vivo (estación real)</div>
           <div class="plc-panel" style="margin:0; box-shadow:none;">
             <div class="plc-panel-head">
-              <h3>CPU 1214C</h3>
+              <h3>CPU 1215C</h3>
               <div class="plc-link"><span class="plc-dot off" id="real-dot"></span><span id="real-link-text">Sin bridge</span></div>
             </div>
             <div class="plc-grid">
@@ -2045,7 +2045,7 @@ let sesion = null;        // sesión de pesaje activa
 let unsubSesion = null;    // función para dejar de escuchar la sesión en Firestore
 
 const FALLBACK_ESTACIONES = [
-  { id: "colegio-don-bosco-real", nombre: "Colegio Don Bosco · PLC real", zona: "CPU 1214C · mesa física · usá ESTA", activa: true },
+  { id: "colegio-don-bosco-real", nombre: "Colegio Don Bosco · PLC real", zona: "CPU 1215C · 6ES7 215-1HG40 · mesa · usá ESTA", activa: true },
   { id: "parque-central",  nombre: "DEMO · PLCSIM (PC)", zona: "Solo simulación 1511C · no es la mesa", activa: true }
 ];
 
@@ -3016,7 +3016,7 @@ function ensureSistemaOnForActuators(){
   }
   const sist = ($("hmi-sistema")?.textContent || "").toUpperCase();
   if(sist === "OFF" || sist === "—"){
-    pulseHmi("Start", 1200);
+    pulseHmi("Start", 2000);
     toast("START (hace falta para luces/actuadores)", { soft: true });
     return false;
   }
@@ -3115,7 +3115,7 @@ function renderHmiFromPlc(data){
 
 function ensureHmiListen(){
   applyHmiStationMode(hmiModeReal, HMI_ESTACION_ID);
-  const label = HMI_ESTACION_ID + (hmiModeReal ? " · REAL 1214C" : " · DEMO 1511C");
+  const label = HMI_ESTACION_ID + (hmiModeReal ? " · REAL 1215C" : " · DEMO 1511C");
   if($("hmi-estacion-id")) $("hmi-estacion-id").textContent = label;
   if($("hmi-estacion-id-real")) $("hmi-estacion-id-real").textContent = label;
   if($("hmi-estacion-badge")) $("hmi-estacion-badge").textContent = label;
@@ -3286,7 +3286,7 @@ function renderRealPanel(data){
     dot.className = "plc-dot " + (plc.emergencia || plc.alarma ? "alarm" : (connected ? "on" : "off"));
   }
   if($("real-link-text")){
-    $("real-link-text").textContent = connected ? ("1214C · " + (plc.estado || "ok")) : "Esperando plc_bridge_real…";
+    $("real-link-text").textContent = connected ? ("1215C · " + (plc.estado || "ok")) : "Esperando plc_bridge_real…";
   }
   if($("real-sistema")) $("real-sistema").textContent = plc.sistemaOn ? "ON" : "OFF";
   if($("real-modo")) $("real-modo").textContent = plc.modoAuto ? "Automático" : "Manual";
@@ -3440,6 +3440,9 @@ $("btn-open-hmi")?.addEventListener("click", () => {
   if(!sesion || !sesion.estacionId){
     toast("Conecta una estación primero");
     return;
+  }
+  if(sesion.estacionId !== HMI_ESTACION_REAL){
+    toast("Ojo: estación DEMO — el bridge de mesa usa colegio-don-bosco-real");
   }
   openHmiForStation(sesion.estacionId);
 });
