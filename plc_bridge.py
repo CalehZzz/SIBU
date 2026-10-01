@@ -374,6 +374,10 @@ def main() -> None:
 
     print("Loop… Ctrl+C sale.\n")
     last_fs_payload: dict | None = None
+    last_fs_write = 0.0
+    # Reafirma plc.conectado aunque el resto del payload no cambie
+    # (la web a veces abría sesión pisando conectado=false).
+    HEARTBEAT_S = 5.0
     try:
         while True:
             # 1) HMI web → PLC
@@ -415,6 +419,16 @@ def main() -> None:
                     f"⚠️  lectura DatosEstacion: {e}\n"
                     "   Tip: py plc_probe.py --ip <misma_IP>  |  plc_real/FIX_DB_INVALID_ADDRESS.md",
                 )
+                if not args.dry_run and sesion_ref is not None:
+                    try:
+                        sesion_ref.update({
+                            "plc.conectado": False,
+                            "actualizado": firestore.SERVER_TIMESTAMP,
+                        })
+                        last_fs_payload = None
+                        last_fs_write = 0.0
+                    except Exception as e2:
+                        _warn_once("fs_offline_err", f"⚠️  Firestore offline flag: {e2}")
                 # PLC caído: no martillar Firestore (cada ciclo hace cmd_ref.get)
                 time.sleep(max(5.0, args.interval * 5))
                 continue
@@ -434,13 +448,16 @@ def main() -> None:
                     "finalizada": payload["finalizada"],
                     "plc": payload["plc"],
                 }
-                # Solo escribir si cambió (evita writes inútiles a Firestore)
-                if fs_body != last_fs_payload:
+                now = time.monotonic()
+                changed = fs_body != last_fs_payload
+                heartbeat = (now - last_fs_write) >= HEARTBEAT_S
+                if changed or heartbeat:
                     sesion_ref.set(
                         {**fs_body, "actualizado": firestore.SERVER_TIMESTAMP},
                         merge=True,
                     )
                     last_fs_payload = fs_body
+                    last_fs_write = now
 
             if payload["finalizada"]:
                 print("\n✅ FinSesion en PLC.")

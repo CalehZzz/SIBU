@@ -3488,12 +3488,16 @@ async function iniciarSesion(estacion){
 
   const sesionRef = doc(db, "sesiones_activas", estacion.id);
   try{
+    // No pisar plc.conectado: el bridge lo pone en true y, si lo
+    // sobrescribimos a false, deja de reescribir (payload idle igual).
+    const prevSnap = await getDoc(sesionRef);
+    const prevPlc = (prevSnap.exists() && prevSnap.data()?.plc) ? prevSnap.data().plc : {};
     await setDoc(sesionRef, {
       materiales: sesion.materiales,
       finalizada: false,
-      plc: { ...PLC_DEFAULT, sesionActiva: true },
+      plc: { ...PLC_DEFAULT, ...prevPlc, sesionActiva: true },
       actualizado: serverTimestamp()
-    });
+    }, { merge: true });
   }catch(e){
     console.error(e);
     toast("⚠️ No se pudo abrir la sesión en Firestore.");
