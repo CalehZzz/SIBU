@@ -1,13 +1,12 @@
 /*
  * SIBU — ESP32 · mesa unificada
- *   HC-SR04 ×2 · LCD · HX711 · RC522
- *
- * WiFi: bins → :8082/api/bins · RFID → :8081/api/rfid
+ * HC ×2 · LCD · HX711 · RC522
  *
  * Librerías: LiquidCrystal I2C · HX711 (bogde) · MFRC522
  *
- * Báscula: si ves HX? a veces = WiFi pisa el HX711 un instante (ya no borra el último kg).
- * Kg altísimos con HX_SCALE=1.0 = normal (son cuentas, no gramos). Calibrá SCALE.
+ * Si el internet/roaming va mal: WIFI_ENABLE = false
+ * (probás báscula/RFID por Serial/LCD sin pelear con WiFi).
+ * Cuando tengas red estable: WIFI_ENABLE = true.
  */
 
 #include <Wire.h>
@@ -19,6 +18,8 @@
 #include <MFRC522.h>
 
 // ===== WiFi =====
+// false = no conecta WiFi (recomendado si el roaming falla)
+const bool WIFI_ENABLE = false;
 const char* WIFI_SSID = "TU_HOTSPOT_O_WIFI";
 const char* WIFI_PASS = "TU_PASSWORD";
 const char* PI_HOST   = "172.20.10.3";
@@ -46,19 +47,20 @@ LiquidCrystal_I2C lcd(LCD_ADDR, 16, 2);
 // Celda: ROJO E+ · NEGRO E− · VERDE A+ · BLANCO A−
 const int HX_DT  = 26;
 const int HX_SCK = 25;
-const bool HX_INVERT = false;
+// Tu log: delta salía negativo → true
+const bool HX_INVERT = true;
 const float HX_CAL_GRAMS = 100.0f;
-// IMPORTANTE: después de calibrar poné el valor que te diga el Serial
-// (ej. 420.0). Con 1.0 el LCD muestra cuentas/1000 → kg inventados altos.
-float HX_SCALE = 1.0f;
+// Con ~500 cuentas / 100 g → 5.0
+float HX_SCALE = 5.0f;
+
 HX711 scale;
 bool hxOk = false;
 int  hxFailStreak = 0;
 long hxTareRaw = 0;
-long hxLastDelta = 0;
+float lastKg = 0.0f;
+unsigned long lastHxMs = 0;
 
 // ===== RC522 =====
-// SDA/SS→5 · SCK→14 · MOSI→13 · MISO→23 · RST→27 · 3.3V
 #define RFID_SS   5
 #define RFID_RST  27
 #define RFID_SCK  14
@@ -74,15 +76,12 @@ bool rfidOk = false;
 
 const int LED_YELLOW = 4;
 const int LED_RED    = 2;
-const int LED_GREEN  = -1;
 
 float lastCm[2] = {NAN, NAN};
 int   lastPct[2] = {0, 0};
 bool  lleno[2] = {false, false};
 bool  sensorOk[2] = {false, false};
-float lastKg = 0.0f;
 unsigned long lastBinsMs = 0;
-unsigned long lastHxMs = 0;
 
 float leerCm(int i, unsigned long* usOut) {
   digitalWrite(TRIG[i], LOW);
@@ -125,17 +124,15 @@ void pintarLcd() {
   else if (!sensorOk[0]) snprintf(l0, sizeof(l0), "P:FAIL cable   ");
   else snprintf(l0, sizeof(l0), "P:%3d%%%s        ", lastPct[0], lleno[0] ? " FULL" : "");
   lcd.print(l0);
+
   lcd.setCursor(0, 1);
   char l1[17];
   if (!sensorOk[1]) {
     snprintf(l1, sizeof(l1), "R:FAIL         ");
-  } else if (!hxOk && hxFailStreak > 8) {
-    // Solo HX? si falló varias veces seguidas (no un glitch de WiFi)
+  } else if (!hxOk && hxFailStreak > 15) {
     snprintf(l1, sizeof(l1), "HX?  R:%3d%%   ", lastPct[1]);
-  } else if (HX_SCALE <= 1.01f) {
-    // Sin calibrar: mostrá delta crudo (cuentas), no "kg"
-    snprintf(l1, sizeof(l1), "d:%5ld R:%3d%%", hxLastDelta, lastPct[1]);
   } else {
+    // Siempre último kg bueno (no parpadea HX? por un fallo)
     snprintf(l1, sizeof(l1), "%5.3fkg R:%3d%%  ", lastKg, lastPct[1]);
   }
   lcd.print(l1);
@@ -175,16 +172,18 @@ void rfidKick() {
 }
 
 bool postRfid(const String& uid) {
-  if (WiFi.status() != WL_CONNECTED) return false;
+  if (!WIFI_ENABLE || WiFi.status() != WL_CONNECTED) {
+    Serial.println("RFID OK local (sin WiFi) — no POST a Pi");
+    return false;
+  }
   HTTPClient http;
   String url = String("http://") + PI_HOST + ":" + PI_RFID + "/api/rfid";
-  http.setTimeout(2500);
+  http.setTimeout(2000);
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   String body = String("{\"uid\":\"") + uid + "\"}";
   int code = http.POST(body);
-  String resp = http.getString();
-  Serial.printf("POST rfid → %d %s\n", code, resp.c_str());
+  Serial.printf("POST rfid → %d\n", code);
   http.end();
   rfidBusReady();
   return code >= 200 && code < 300;
@@ -225,88 +224,85 @@ bool hxWaitReady(unsigned long timeoutMs) {
   return scale.is_ready();
 }
 
-void leerBascula() {
-  // No leer HX en cada tick si acabamos de leer (deja respirar al WiFi/SPI)
-  if (millis() - lastHxMs < 300UL && hxOk) return;
-  lastHxMs = millis();
-
-  scale.power_up();
-  if (!hxWaitReady(80)) {
-    hxFailStreak++;
-    // NO apagues hxOk de una: mantené el último kg en LCD
-    if (hxFailStreak > 8) hxOk = false;
-    if (DEBUG_HX) Serial.printf("HX skip (not ready) streak=%d — se mantiene kg=%.4f\n", hxFailStreak, lastKg);
-    return;
-  }
-
-  // 5 lecturas, descartá min/max (filtro simple de picos)
-  long vals[5];
+long hxReadMedian(int want) {
+  long vals[9];
   int n = 0;
-  for (int i = 0; i < 5; i++) {
-    if (!hxWaitReady(40)) continue;
+  for (int i = 0; i < want; i++) {
+    if (!hxWaitReady(60)) {
+      delay(5);
+      continue;
+    }
     vals[n++] = scale.read();
-    delay(3);
+    delay(4);
   }
-  if (n < 3) {
-    hxFailStreak++;
-    if (hxFailStreak > 8) hxOk = false;
-    if (DEBUG_HX) Serial.println("HX pocas muestras");
-    return;
-  }
-
-  // bubble sort chico
+  if (n < 3) return 0x7FFFFFFF;  // sentinel = fallo
   for (int i = 0; i < n - 1; i++) {
     for (int j = i + 1; j < n; j++) {
       if (vals[j] < vals[i]) {
-        long t = vals[i];
-        vals[i] = vals[j];
-        vals[j] = t;
+        long t = vals[i]; vals[i] = vals[j]; vals[j] = t;
       }
     }
   }
-  long raw = vals[n / 2];  // mediana
+  return vals[n / 2];
+}
+
+void hxDoTare() {
+  scale.power_up();
+  delay(150);
+  long sum = 0;
+  int n = 0;
+  for (int i = 0; i < 25; i++) {
+    long v = hxReadMedian(5);
+    if (v == 0x7FFFFFFF) continue;
+    sum += v;
+    n++;
+    delay(10);
+  }
+  if (n > 3) {
+    hxTareRaw = sum / n;
+    hxOk = true;
+    hxFailStreak = 0;
+    lastKg = 0;
+    Serial.printf("HX TARE raw=%ld (n=%d)\n", hxTareRaw, n);
+  } else {
+    Serial.println("HX TARE falló");
+  }
+}
+
+void leerBascula() {
+  if (millis() - lastHxMs < 250UL) return;
+  lastHxMs = millis();
+
+  scale.power_up();
+  long raw = hxReadMedian(7);
+  if (raw == 0x7FFFFFFF) {
+    hxFailStreak++;
+    if (hxFailStreak > 15) hxOk = false;
+    if (DEBUG_HX) Serial.printf("HX pocas muestras streak=%d (kg se mantiene %.3f)\n", hxFailStreak, lastKg);
+    return;
+  }
+
   long delta = raw - hxTareRaw;
   if (HX_INVERT) delta = -delta;
 
-  // Rechazar picos absurdos vs lectura anterior (ruido / glitch)
-  if (hxOk && hxLastDelta != 0) {
-    long jump = delta - hxLastDelta;
-    if (jump < 0) jump = -jump;
-    // si SCALE aún es 1, delta es grande; umbral en cuentas ~ 2e6
-    if (jump > 2000000L) {
-      if (DEBUG_HX) Serial.printf("HX pico ignorado delta=%ld (prev=%ld)\n", delta, hxLastDelta);
-      return;
-    }
+  // gramos
+  float g = (float)delta / HX_SCALE;
+  // ruido chico alrededor de 0
+  if (g > -3.0f && g < 3.0f) g = 0;
+  if (g < 0) g = 0;
+  if (g > 30000.0f) {
+    if (DEBUG_HX) Serial.printf("HX g absurdo %.1f ignore\n", g);
+    return;
   }
 
   hxFailStreak = 0;
   hxOk = true;
-  hxLastDelta = delta;
-
-  float units = (float)delta / HX_SCALE;
-  if (units < 0 && units > -5.0f) units = 0;
-  if (units < 0) units = 0;
-  // Tope demo: más de 50 kg con SCALE calibrado = basura
-  if (HX_SCALE > 1.01f && units > 50000.0f) {
-    if (DEBUG_HX) Serial.printf("HX units absurdas %.1f — ignore\n", units);
-    return;
-  }
-  lastKg = units / 1000.0f;
+  lastKg = g / 1000.0f;
 
   if (DEBUG_HX) {
-    Serial.printf(
-      "HX raw=%ld tare=%ld delta=%ld  → %.1f (SCALE=%.3f)  kg=%.4f\n",
-      raw, hxTareRaw, delta, units, HX_SCALE, lastKg
-    );
-    long ad = delta < 0 ? -delta : delta;
-    if (ad < 200) {
-      Serial.println("HX aviso: delta~0 → montaje 3D no carga la celda");
-    } else if (HX_SCALE <= 1.01f) {
-      Serial.printf(
-        "HX calib: con %.0fg →  HX_SCALE = %ld / %.0f  = %.1f\n",
-        HX_CAL_GRAMS, ad, HX_CAL_GRAMS, (float)ad / HX_CAL_GRAMS
-      );
-    }
+    Serial.printf("HX raw=%ld tare=%ld delta=%ld  g=%.1f  kg=%.4f  SCALE=%.2f INV=%d\n",
+                  raw, hxTareRaw, HX_INVERT ? -(raw - hxTareRaw) : (raw - hxTareRaw),
+                  g, lastKg, HX_SCALE, (int)HX_INVERT);
   }
 }
 
@@ -324,25 +320,22 @@ void publicarBins(const char* lamp, bool stopAll) {
     "\"demo\":true}",
     isnan(lastCm[0]) ? -1.0 : lastCm[0], lastPct[0], lleno[0] ? "true" : "false",
     isnan(lastCm[1]) ? -1.0 : lastCm[1], lastPct[1], lleno[1] ? "true" : "false",
-    lastKg,
-    lamp,
-    stopAll ? "true" : "false",
+    lastKg, lamp, stopAll ? "true" : "false",
     (lleno[0] && !lleno[1]) ? "true" : "false"
   );
-
   Serial.println(buf);
 
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    http.setTimeout(2500);
-    String url = String("http://") + PI_HOST + ":" + PI_BINS + "/api/bins";
-    http.begin(url);
-    http.addHeader("Content-Type", "application/json");
-    int code = http.POST(String(buf));
-    Serial.printf("POST bins → %d\n", code);
-    http.end();
-    rfidBusReady();
-  }
+  if (!WIFI_ENABLE || WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  http.setTimeout(2000);
+  String url = String("http://") + PI_HOST + ":" + PI_BINS + "/api/bins";
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  int code = http.POST(String(buf));
+  Serial.printf("POST bins → %d\n", code);
+  http.end();
+  rfidBusReady();
 }
 
 void tickBins() {
@@ -354,7 +347,6 @@ void tickBins() {
     float cm2 = leerCm(i, &us2);
     if (!isnan(cm) && !isnan(cm2)) cm = (cm + cm2) / 2.0f;
     else if (isnan(cm)) cm = cm2;
-
     lastCm[i] = cm;
     sensorOk[i] = !isnan(cm);
     lastPct[i] = cmToPct(i, cm);
@@ -367,10 +359,7 @@ void tickBins() {
 
   bool stopAll = lleno[1] && !DEMO_NO_STOP;
   bool divertP = lleno[0] && !stopAll;
-  const char* lamp = "green";
-  if (stopAll) lamp = "red";
-  else if (divertP) lamp = "yellow";
-
+  const char* lamp = stopAll ? "red" : (divertP ? "yellow" : "green");
   if (LED_RED >= 0) digitalWrite(LED_RED, stopAll ? HIGH : LOW);
   if (LED_YELLOW >= 0) digitalWrite(LED_YELLOW, divertP ? HIGH : LOW);
 
@@ -383,6 +372,8 @@ void setup() {
   delay(800);
   Serial.println();
   Serial.println("=== SIBU ESP32 boot ===");
+  Serial.printf("WIFI_ENABLE=%d  HX_INVERT=%d  HX_SCALE=%.2f\n",
+                (int)WIFI_ENABLE, (int)HX_INVERT, HX_SCALE);
 
   for (int i = 0; i < 2; i++) {
     pinMode(TRIG[i], OUTPUT);
@@ -398,89 +389,55 @@ void setup() {
   lcd.clear();
   lcd.print("SIBU ESP32");
   lcd.setCursor(0, 1);
-  lcd.print("HC+HX+RFID");
+  lcd.print(WIFI_ENABLE ? "WiFi ON " : "WiFi OFF");
 
   scale.begin(HX_DT, HX_SCK);
   delay(400);
   scale.set_gain(128);
   scale.power_up();
   Serial.print("HX711 wait");
-  hxOk = false;
-  for (int i = 0; i < 80; i++) {
-    if (scale.is_ready()) { hxOk = true; break; }
+  for (int i = 0; i < 60 && !scale.is_ready(); i++) {
     Serial.print(".");
     delay(50);
   }
   Serial.println();
-  if (!hxOk) {
-    Serial.println("HX711 FAIL — VCC 3V3 · DT26 · SCK25 · GND");
-  } else {
-    delay(200);
-    // Promedio de tara más largo = más estable
-    long sum = 0;
-    int n = 0;
-    for (int i = 0; i < 30; i++) {
-      if (hxWaitReady(100)) {
-        sum += scale.read();
-        n++;
-      }
-      delay(5);
-    }
-    hxTareRaw = (n > 0) ? (sum / n) : 0;
-    hxLastDelta = 0;
-    hxFailStreak = 0;
-    Serial.printf("HX711 OK tare_raw=%ld  HX_SCALE=%.3f\n", hxTareRaw, HX_SCALE);
-    Serial.println("LCD sin calibrar muestra d:##### (delta), no kg.");
-    Serial.printf("Con %.0fg: HX_SCALE = |delta|/%.0f  luego re-flash\n", HX_CAL_GRAMS, HX_CAL_GRAMS);
-  }
+  hxDoTare();
 
   rfidKick();
-  if (rfidOk) Serial.println("RC522 OK — sacá y acercá tarjeta");
-  else Serial.println("RC522 FAIL");
-
+  Serial.println(rfidOk ? "RC522 OK" : "RC522 FAIL");
   Serial.println("Pines: HC 18/19 33/32 | HX 26/25 | RFID 5/14/13/23/27");
 
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  Serial.print("WiFi");
-  for (int i = 0; i < 40 && WiFi.status() != WL_CONNECTED; i++) {
-    delay(250);
-    Serial.print(".");
-  }
-  Serial.println();
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("IP ");
-    Serial.println(WiFi.localIP());
-    Serial.printf("Pi %s bins:%d rfid:%d\n", PI_HOST, PI_BINS, PI_RFID);
+  if (WIFI_ENABLE) {
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    Serial.print("WiFi");
+    for (int i = 0; i < 40 && WiFi.status() != WL_CONNECTED; i++) {
+      delay(250);
+      Serial.print(".");
+    }
+    Serial.println();
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.print("IP ");
+      Serial.println(WiFi.localIP());
+    } else {
+      Serial.println("WiFi FAIL — sigo local");
+    }
+    rfidKick();
+    // Retara con WiFi ya decidido
+    delay(200);
+    hxDoTare();
   } else {
-    Serial.println("WiFi FAIL");
+    WiFi.mode(WIFI_OFF);
+    Serial.println("WiFi OFF — báscula/RFID solo local (Serial/LCD)");
   }
 
-  rfidKick();
-  // Retara DESPUÉS del WiFi (el consumo cambia un poco el offset)
-  if (hxOk) {
-    delay(300);
-    long sum = 0;
-    int n = 0;
-    for (int i = 0; i < 20; i++) {
-      if (hxWaitReady(80)) {
-        sum += scale.read();
-        n++;
-      }
-      delay(5);
-    }
-    if (n > 5) {
-      hxTareRaw = sum / n;
-      Serial.printf("HX retara post-WiFi tare_raw=%ld\n", hxTareRaw);
-    }
-  }
-  Serial.println("SIBU listo");
+  Serial.println("SIBU listo — vacío al boot = 0 kg; poné peso y mirá g=");
 }
 
 void loop() {
   pollRfid();
   unsigned long now = millis();
-  if (now - lastBinsMs >= 550UL) {
+  if (now - lastBinsMs >= 600UL) {
     lastBinsMs = now;
     tickBins();
   }
