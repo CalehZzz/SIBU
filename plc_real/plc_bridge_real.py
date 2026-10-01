@@ -28,23 +28,37 @@ DEFAULT_IP = "192.168.0.1"
 
 
 def _inject_defaults(argv: list[str]) -> list[str]:
-    """Si no pasas estación/IP, usa defaults del PLC real."""
+    """Si no pasas estación/IP, usa defaults del PLC real (perfil mesa)."""
     args = list(argv)
-    # py script.py  →  py script.py colegio-don-bosco-real --ip ...
+    # py script.py  →  py script.py colegio-don-bosco-real --ip ... --perfil mesa
     if len(args) == 1:
-        return [args[0], DEFAULT_ESTACION, "--ip", DEFAULT_IP, "--db", "1", "--db-hmi", "3"]
+        return [
+            args[0],
+            DEFAULT_ESTACION,
+            "--ip",
+            DEFAULT_IP,
+            "--db",
+            "1",
+            "--db-hmi",
+            "3",
+            "--perfil",
+            "mesa",
+        ]
     # py script.py --ip x  → inserta estación
     if len(args) > 1 and args[1].startswith("-"):
-        return [args[0], DEFAULT_ESTACION] + args[1:]
+        args = [args[0], DEFAULT_ESTACION] + args[1:]
+    # Asegurar perfil mesa si no lo pasaron
+    if "--perfil" not in args:
+        args += ["--perfil", "mesa"]
     return args
 
 
 if __name__ == "__main__":
     sys.argv = _inject_defaults(sys.argv)
-    print("=== SIBU bridge · PLC REAL 1215C (6ES7 215-1HG40-0XB0 V4.5) ===")
+    print("=== SIBU bridge · PLC REAL 1215C (6ES7 215-1HG40-0XB0 V4.5) · perfil MESA ===")
     print(f"CWD={ROOT}")
     print(f"Args: {' '.join(sys.argv[1:])}")
-    print("Sensores/actuadores: I/Q físicos · 3 pistones (ver plc_real/NETWORKS_LAD.md)\n")
+    print("DB_HMI: Manual_Banda @ DBX1.3 (ver plc_real/DB_HMI_MESA.md)\n")
     from plc_bridge import main
 
     main()

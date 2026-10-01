@@ -68,8 +68,8 @@ def _db_max_readable(client: snap7.client.Client, dbn: int, sizes: tuple[int, ..
             break
     return max_ok
 
-BOOL_MAP = [
-    # (firestore_key, byte, bit)
+BOOL_MAP_SIBU = [
+    # Contrato docs / PLCSIM (tia/MAPA_DB_HMI.md)
     ("Start", 0, 0),
     ("Stop", 0, 1),
     ("Emergencia", 0, 2),
@@ -87,6 +87,27 @@ BOOL_MAP = [
     ("SensorVidrio", 1, 6),       # sim / real → I_SensorVidrio
 ]
 
+# Programa TIA de mesa (pantallazo): Manual_Banda = DB3.DBX1.3
+# Ver plc_real/DB_HMI_MESA.md — Start/Modo offsets asumidos hasta confirmar DB completa.
+BOOL_MAP_MESA = [
+    ("Start", 0, 0),
+    ("Stop", 0, 1),
+    ("Emergencia", 0, 2),
+    ("ResetAlarma", 0, 3),
+    ("ModoAuto", 0, 4),
+    ("FinSesion", 0, 5),
+    ("ManualPiston", 0, 6),       # TBD en TIA mesa
+    ("ManualBanda", 1, 3),        # CONFIRMADO: DB_HMI.Manual_Banda
+    ("BasculaLista", 1, 0),
+    ("SensorPieza", 1, 1),
+    ("SensorPlastico", 1, 2),
+    ("ManualPiston1", 1, 4),
+    ("ManualPiston2", 1, 5),
+    ("SensorVidrio", 1, 6),
+]
+
+BOOL_MAP = BOOL_MAP_SIBU
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Bridge Guacamayos HMI↔PLC↔Firestore")
@@ -96,6 +117,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--slot", type=int, default=1)
     p.add_argument("--db", type=int, default=1, help="DB DatosEstacion")
     p.add_argument("--db-hmi", type=int, default=3, help="DB_HMI comandos")
+    p.add_argument(
+        "--perfil",
+        choices=("sibu", "mesa"),
+        default="sibu",
+        help="Mapa DB_HMI: sibu=docs/sim · mesa=TIA real (Manual_Banda@1.3)",
+    )
     p.add_argument(
         "--interval",
         type=float,
@@ -332,8 +359,14 @@ def reset_sesion_en_plc(client: snap7.client.Client, db_number: int) -> None:
 
 
 def main() -> None:
+    global BOOL_MAP
     args = parse_args()
-    print(f"PLC {args.ip} r{args.rack}s{args.slot} | DatosEstacion=DB{args.db} | DB_HMI=DB{args.db_hmi}")
+    BOOL_MAP = BOOL_MAP_MESA if args.perfil == "mesa" else BOOL_MAP_SIBU
+    mb = next((f"{b}.{bit}" for k, b, bit in BOOL_MAP if k == "ManualBanda"), "?")
+    print(
+        f"PLC {args.ip} r{args.rack}s{args.slot} | DatosEstacion=DB{args.db} | "
+        f"DB_HMI=DB{args.db_hmi} | perfil={args.perfil} (ManualBanda@{mb})"
+    )
 
     try:
         plc = conectar_plc(args.ip, args.rack, args.slot)
