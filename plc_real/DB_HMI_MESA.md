@@ -1,41 +1,48 @@
-# DB_HMI de la mesa (programa TIA real · distinto al contrato “SIBU docs”)
+# DB_HMI — programa TIA **mesa** (CPU 1215C)
 
-El LAD de la CPU **1215C** (`6ES7 215-1HG40-0XB0`) **no** usa el mismo mapa que `tia/MAPA_DB_HMI.md`.
+Mapa real del proyecto en TIA (pantallazos). Distinto de `tia/MAPA_DB_HMI.md` (SIBU/sim).
 
-## Confirmado en TIA (pantallazos)
+Bridge: `py plc_real/plc_bridge_real.py --ip …` → **`--perfil mesa`** (default).
 
-### Control de banda
-- **AUTO:** `M_SistemaOn` · `M_AutoActivo` · `M_PiezaEnProceso` · `/M_Standby` · `/M_Falla` · `/I_Emergencia` · `/M_ParadaInspeccion` · `/M_ParadaClasificacion` → `Q_Banda`
-- **MANUAL:** `M_SistemaOn` · `M_ManualActivo` · (`M_ManualBanda` **OR** `DB_HMI.Manual_Banda`) · `/M_Falla` · `/I_Emergencia` → `Q_Banda`
-- Bit HMI banda: **`%DB3.DBX1.3`** = `DB_HMI.Manual_Banda`
+## Comandos (web → bridge → PLC)
 
-### Parada inspección
-- Set `M_ParadaInspeccion`: `M_PiezaEnProceso` · `I_PiezaInspeccion`
-- Reset: `I_AnalisisListo`
-- Solo corta rama **AUTO** de banda (no la manual)
-
-## Mapa bridge `--perfil mesa`
-
-| Firestore / bridge | Offset mesa | Nota |
+| Tag TIA | Offset | Key Firestore / bridge |
 |---|---|---|
-| `Start` | **0.0** | *asumido — confirmar en TIA* |
-| `Stop` | **0.1** | *asumido* |
-| `Emergencia` | **0.2** | *asumido (además hay `I_Emergencia` físico)* |
-| `ResetAlarma` | **0.3** | *asumido* |
-| `ModoAuto` | **0.4** | *asumido — debe relacionarse con `M_AutoActivo` / `M_ManualActivo`* |
-| `FinSesion` | **0.5** | *asumido* |
-| `ManualPiston` (P3) | **0.6** | *libre en docs viejos; mesa TBD* |
-| `ManualBanda` | **1.3** | **CONFIRMADO** (`Manual_Banda`) |
-| `ManualPiston1` | **1.4** | *asumido / TBD* |
-| `ManualPiston2` | **1.5** | *asumido / TBD* |
+| `Start` | 0.0 | `Start` |
+| `Stop` | 0.1 | `Stop` |
+| `Reset` | 0.2 | `ResetAlarma` |
+| `Emergencia` | 0.3 | `Emergencia` |
+| `ModoAuto` | 0.4 | `ModoAuto` |
+| `ModoManual` | 0.5 | derivado: `NOT ModoAuto` |
+| `IA_Plastico` … `IA_AnalisisListo` | 0.6–1.2 | (visión; no los pisa el bridge) |
+| `Manual_Banda` | **1.3** | `ManualBanda` |
+| `Manual_PistonPlastico` | 1.4 | `ManualPiston1` |
+| `Manual_PistonVidrio` | 1.5 | `ManualPiston` (P3 web) |
+| `Manual_PistonMetal` | 1.6 | `ManualPiston2` (P2 web) |
 
-> Si Start no pone `M_SistemaOn`, el offset de Start está mal o la red Set en TIA es otra. Mandá pantallazo de **toda la declaración de DB_HMI** y de la red que hace `(S) M_SistemaOn`.
+## Estado (PLC → bridge → web)
 
-## Condiciones para que Marcha mueva la banda
+| Tag TIA | Offset | Campo web |
+|---|---|---|
+| `Estado_SistemaOn` | **1.7** | `plc.sistemaOn` |
+| `Estado_AutoActivo` | 2.0 | `plc.modoAuto` |
+| `Estado_ManualActivo` | 2.1 | (info) |
+| `Estado_Standby` | 2.2 | |
+| `Estado_Falla` | 2.3 | `plc.alarma` |
+| `Estado_Emergencia` | 2.4 | `plc.emergencia` |
+| `Estado_BandaActiva` | 2.5 | `plc.banda` |
+| `Estado_PistonPlastico` | 2.6 | `plc.piston1` |
+| `Estado_PistonVidrio` | 2.7 | `plc.piston3` |
+| `Estado_PistonMetal` | 3.0 | `plc.piston2` |
+| `Conteo_Plastico/Vidrio/Metal` | 4 / 6 / 8 | materiales.* |
+| `Peso_*` | 14 / 18 / 22 | materiales.*.pesoKg |
 
-1. `M_SistemaOn` = 1  
-2. `M_ManualActivo` = 1  
-3. `DB_HMI.Manual_Banda` @ **1.3** = 1  
-4. `M_Falla` = 0 · `I_Emergencia` = 0  
+## Reglas del bridge mesa
 
-Sin (1) o (2), el bit de banda llega y la UI “vuelve a Parada”.
+1. **RMW** solo bytes 0–1 de comandos — **no** escribe `Estado_SistemaOn@1.7` ni bytes ≥2.  
+2. Si hay `ManualBanda` / pistón → fuerza `ModoManual=1` y `ModoAuto=0`.  
+3. Banda Manual en LAD: `M_SistemaOn` · `M_ManualActivo` · `Manual_Banda` · `/M_Falla` · `/I_Emergencia`.
+
+## Bug que había
+
+El bridge SIBU escribía 6 bytes en cero desde offset 0 → **borraba** `Estado_SistemaOn` y el resto de estados cada ciclo, y además `ManualBanda` iba a **0.6** (en mesa eso es `IA_Plastico`, no la banda).

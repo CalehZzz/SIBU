@@ -87,26 +87,23 @@ BOOL_MAP_SIBU = [
     ("SensorVidrio", 1, 6),       # sim / real → I_SensorVidrio
 ]
 
-# Programa TIA de mesa (pantallazo): Manual_Banda = DB3.DBX1.3
-# Ver plc_real/DB_HMI_MESA.md — Start/Modo offsets asumidos hasta confirmar DB completa.
+# Programa TIA mesa (pantallazos DB_HMI reales). Ver plc_real/DB_HMI_MESA.md
+# NO incluir Estado_* aquí: el PLC los escribe; nosotros solo tocamos comandos.
 BOOL_MAP_MESA = [
     ("Start", 0, 0),
     ("Stop", 0, 1),
-    ("Emergencia", 0, 2),
-    ("ResetAlarma", 0, 3),
+    ("ResetAlarma", 0, 2),        # tag TIA: Reset
+    ("Emergencia", 0, 3),
     ("ModoAuto", 0, 4),
-    ("FinSesion", 0, 5),
-    ("ManualPiston", 0, 6),       # TBD en TIA mesa
-    ("ManualBanda", 1, 3),        # CONFIRMADO: DB_HMI.Manual_Banda
-    ("BasculaLista", 1, 0),
-    ("SensorPieza", 1, 1),
-    ("SensorPlastico", 1, 2),
-    ("ManualPiston1", 1, 4),
-    ("ManualPiston2", 1, 5),
-    ("SensorVidrio", 1, 6),
+    ("ModoManual", 0, 5),
+    ("ManualBanda", 1, 3),        # Manual_Banda
+    ("ManualPiston1", 1, 4),      # Manual_PistonPlastico
+    ("ManualPiston", 1, 5),       # Manual_PistonVidrio (P3 web)
+    ("ManualPiston2", 1, 6),      # Manual_PistonMetal (P2 web / latas)
 ]
 
 BOOL_MAP = BOOL_MAP_SIBU
+_PERFIL = "sibu"
 
 
 def parse_args() -> argparse.Namespace:
@@ -285,7 +282,103 @@ def leer_datos_estacion(client: snap7.client.Client, db_number: int) -> dict:
     }
 
 
+def normalizar_cmd_mesa(cmd: dict) -> dict:
+    """Web usa ModoAuto; TIA mesa exige ModoAuto XOR ModoManual."""
+    out = dict(cmd)
+    auto = bool(out.get("ModoAuto", True))
+    # Si la web manda ManualBanda/pistón, forzar manual
+    if out.get("ManualBanda") or out.get("ManualPiston1") or out.get("ManualPiston2") or out.get("ManualPiston"):
+        auto = False
+    out["ModoAuto"] = auto
+    out["ModoManual"] = not auto
+    return out
+
+
+def escribir_db_hmi_mesa(client: snap7.client.Client, db_hmi: int, cmd: dict) -> None:
+    """RMW solo bytes 0–1 de comandos. Nunca pisa Estado_SistemaOn@1.7 ni bytes ≥2."""
+    raw = bytearray(client.db_read(db_hmi, 0, 2))
+    cmd2 = normalizar_cmd_mesa(cmd)
+    for key, byte, bit in BOOL_MAP_MESA:
+        if byte > 1:
+            continue
+        if byte == 1 and bit >= 7:  # 1.7 = Estado_SistemaOn (PLC)
+            continue
+        set_bool(raw, byte, bit, bool(cmd2.get(key, False)))
+    client.db_write(db_hmi, 0, raw)
+
+
+def leer_estado_mesa(client: snap7.client.Client, db_hmi: int) -> dict:
+    """Estado y conteos viven en DB_HMI (no en el layout SIBU de DatosEstacion)."""
+    raw = None
+    last_err: Exception | None = None
+    for sz in (50, 34, 16, 8, 4, 2):
+        try:
+            raw = client.db_read(db_hmi, 0, sz)
+            break
+        except Exception as e:
+            last_err = e
+    if raw is None:
+        raise RuntimeError(f"No se pudo leer DB_HMI mesa DB{db_hmi}") from last_err
+
+    used = len(raw)
+    cont_p = int(get_int(raw, 4)) if used >= 6 else 0
+    cont_v = int(get_int(raw, 6)) if used >= 8 else 0
+    cont_m = int(get_int(raw, 8)) if used >= 10 else 0
+    peso_p = round(float(get_real(raw, 14)), 4) if used >= 18 else 0.0
+    peso_v = round(float(get_real(raw, 18)), 4) if used >= 22 else 0.0
+    peso_m = round(float(get_real(raw, 22)), 4) if used >= 26 else 0.0
+
+    sistema_on = bool(get_bool(raw, 1, 7)) if used >= 2 else False
+    modo_auto = bool(get_bool(raw, 2, 0)) if used >= 3 else False
+    emergencia = bool(get_bool(raw, 2, 4)) if used >= 3 else False
+    falla = bool(get_bool(raw, 2, 3)) if used >= 3 else False
+    banda = bool(get_bool(raw, 2, 5)) if used >= 3 else False
+    p1 = bool(get_bool(raw, 2, 6)) if used >= 3 else False
+    p3 = bool(get_bool(raw, 2, 7)) if used >= 3 else False  # vidrio
+    p2 = bool(get_bool(raw, 3, 0)) if used >= 4 else False  # metal → slot aluminio web
+
+    if emergencia:
+        estado = "emergencia"
+    elif falla:
+        estado = "alarma"
+    elif banda or p1 or p2 or p3:
+        estado = "running"
+    elif sistema_on:
+        estado = "idle"
+    else:
+        estado = "idle"
+
+    return {
+        "materiales": {
+            "plastico": {"piezas": cont_p, "pesoKg": peso_p},
+            "aluminio": {"piezas": cont_m, "pesoKg": peso_m},  # Metal en TIA mesa
+            "vidrio": {"piezas": cont_v, "pesoKg": peso_v},
+        },
+        "finalizada": False,
+        "plc": {
+            "conectado": True,
+            "sistemaOn": sistema_on,
+            "modoAuto": modo_auto,
+            "emergencia": emergencia,
+            "alarma": falla,
+            "banda": banda,
+            "piston": p1 or p2 or p3,
+            "piston1": p1,
+            "piston2": p2,
+            "piston3": p3,
+            "estado": estado,
+            "ultimoMaterial": None,
+            "pesoActualKg": 0.0,
+            "sesionActiva": sistema_on,
+        },
+    }
+
+
 def escribir_db_hmi(client: snap7.client.Client, db_hmi: int, cmd: dict) -> None:
+    if _PERFIL == "mesa":
+        escribir_db_hmi_mesa(client, db_hmi, cmd)
+        return
+
     peso = cmd.get("PesoActualKg", 0.0)
     try:
         peso = float(peso)
@@ -359,14 +452,17 @@ def reset_sesion_en_plc(client: snap7.client.Client, db_number: int) -> None:
 
 
 def main() -> None:
-    global BOOL_MAP
+    global BOOL_MAP, _PERFIL
     args = parse_args()
+    _PERFIL = args.perfil
     BOOL_MAP = BOOL_MAP_MESA if args.perfil == "mesa" else BOOL_MAP_SIBU
     mb = next((f"{b}.{bit}" for k, b, bit in BOOL_MAP if k == "ManualBanda"), "?")
     print(
         f"PLC {args.ip} r{args.rack}s{args.slot} | DatosEstacion=DB{args.db} | "
         f"DB_HMI=DB{args.db_hmi} | perfil={args.perfil} (ManualBanda@{mb})"
     )
+    if args.perfil == "mesa":
+        print("   Mesa: RMW comandos · lee Estado_* desde DB3 (no pisa 1.7+)")
 
     try:
         plc = conectar_plc(args.ip, args.rack, args.slot)
@@ -493,11 +589,14 @@ def main() -> None:
 
             # 2) PLC → web
             try:
-                payload = leer_datos_estacion(plc, args.db)
+                if args.perfil == "mesa":
+                    payload = leer_estado_mesa(plc, args.db_hmi)
+                else:
+                    payload = leer_datos_estacion(plc, args.db)
             except Exception as e:
                 _warn_once(
                     "read_datos_err",
-                    f"⚠️  lectura DatosEstacion: {e}\n"
+                    f"⚠️  lectura estado PLC: {e}\n"
                     "   Tip: py plc_probe.py --ip <misma_IP>  |  plc_real/FIX_DB_INVALID_ADDRESS.md",
                 )
                 if not args.dry_run and sesion_ref is not None:
