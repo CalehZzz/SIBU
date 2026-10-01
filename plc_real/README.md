@@ -20,7 +20,7 @@ Página SIBU / HMI web  (Start, Stop, manual, emergencia…)
 
 Visión / Costa Rica: carpeta [`costa_rica/`](../costa_rica/).
 
-**Guía desde cero (compañera):** [`docs/14_GUIA_COMPANERA_TIA_DESDE_CERO.md`](../docs/14_GUIA_COMPANERA_TIA_DESDE_CERO.md)
+**Guía desde cero:** [`docs/14_GUIA_TIA_PLC_DESDE_CERO.md`](../docs/14_GUIA_TIA_PLC_DESDE_CERO.md)
 
 | Modo | Carpeta | CPU | Qué hay en mesa |
 |---|---|---|---|

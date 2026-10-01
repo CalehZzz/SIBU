@@ -1,10 +1,9 @@
 # Guía desde CERO — TIA Portal + PLC 1214C + que funcione todo
 
-**Para:** compañera que no ha configurado nada.  
 **Meta:** proyecto TIA nuevo → ladder completo → download al PLC → ciclo real + web.  
-**Carpeta del repo:** `plc_real/` (esto es el PLC **físico**; no uses el proyecto de simulación 1511C).
+**Carpeta del repo:** `plc_real/` (PLC **físico**; no uses el proyecto de simulación 1511C).
 
-Leé esto **en orden**. No saltes pasos. Cada sección dice **qué** hacer y **por qué**.
+Seguí esto **en orden**. No saltes pasos. Cada sección dice **qué** hacer y **por qué**.
 
 ---
 
@@ -28,6 +27,7 @@ El ESP32 manda niveles de botes (y RFID) por WiFi a la Pi.
 | Gemini | Material 1/2/3/4 | Después |
 | ESP32 (botes + RFID) | Plus mesa | Independiente / paralelo |
 | Automation Studio | Rúbrica sim (otro PC) | **No** en este documento |
+
 
 ---
 
@@ -653,5 +653,5 @@ Si el bridge dice DB pequeño: leé `plc_real/FIX_DB_INVALID_ADDRESS.md` (casi s
 
 ---
 
-**Frase para ella:**  
+**Regla de oro:**  
 Primero el PLC debe clasificar **solo con TIA Online** (forzando tags). Después Pi y web. Si invertís el orden, vas a depurar tres sistemas a la vez.

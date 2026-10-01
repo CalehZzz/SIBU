@@ -12,7 +12,7 @@ PLC real: CPU **1214C** → carpeta [`plc_real/`](plc_real/).
 HMI usable + app = web (plus); atajo lab sin AS: [`docs/11_SIN_AS_SOLO_WEB.md`](docs/11_SIN_AS_SOLO_WEB.md).
 
 1. [`docs/12_RUBRICA_CAPAS.md`](docs/12_RUBRICA_CAPAS.md) — **qué es obligatorio vs plus**  
-2. [`docs/14_GUIA_COMPANERA_TIA_DESDE_CERO.md`](docs/14_GUIA_COMPANERA_TIA_DESDE_CERO.md) — **TIA + PLC desde cero (paso a paso)**  
+2. [`docs/14_GUIA_TIA_PLC_DESDE_CERO.md`](docs/14_GUIA_TIA_PLC_DESDE_CERO.md) — **TIA + PLC desde cero (paso a paso)**  
 3. [`docs/13_CONECTAR_TODO.md`](docs/13_CONECTAR_TODO.md) — **cómo conectar AS + TIA + físico + web**  
 4. [`docs/02_GUIA_AUTOMATION_STUDIO.md`](docs/02_GUIA_AUTOMATION_STUDIO.md) — AS (rúbrica)  
 5. [`tia/TABLA_TAGS_DESDE_CERO.md`](tia/TABLA_TAGS_DESDE_CERO.md) — tags (3 pistones)  
