@@ -84,25 +84,22 @@ Verde y blanco son la **señal diferencial** (no son VCC/GND). Si `raw` no cambi
 | **SCK** / PD_SCK | GPIO **25** |
 | B+ / B− | no conectar |
 
-### Si `pesoKg` siempre 0.0000
+### Si el peso “anda pero mal” (mismo valor / números locos)
 
-1. Re-flash con `DEBUG_HX = true` (ya viene ON).  
-2. Serial 115200 — buscá `HX raw=` o `HX FAIL`.
+1. Serial: mirá `delta=` vacío vs con peso.  
+2. **`delta` casi 0** → problema **mecánico / 3D**, no del código:  
+   - Un extremo de la celda fijo a la base, el otro **solo** a la plataforma.  
+   - La plataforma **no** debe tocar paredes ni tornillos que salten la celda.  
+3. **`delta` cambia mucho** pero kg loco → calibrá:  
+   `HX_SCALE = |delta| / gramos` (ej. delta=45000 con 100 g → `HX_SCALE = 450.0`).  
+4. Si al cargar el raw **baja**, poné `HX_INVERT = true` o intercambiá verde/blanco.
 
-| Serial | Qué hacer |
-|---|---|
-| `HX FAIL not ready` | VCC **5V**, DT↔26, SCK↔25, GND; no cruces DT/SCK |
-| `raw=` no cambia al poner peso | Celda mal en E/A; aflojá tornillos / otra celda |
-| `raw=` cambia pero `units≈0` o absurdo | **Calibrá `HX_SCALE`** |
+### Si el RFID dejó de leer
 
-### Calibrar
-
-1. Vacío al boot (hace tare).  
-2. Poné **100 g** conocidos.  
-3. Anotá `units=XXXg` en Serial.  
-4. Nuevo factor: `HX_SCALE = HX_SCALE * units / 100`  
-   Ejemplo: SCALE era 420 y units=850 → `HX_SCALE = 420 * 850 / 100 = 3570`.  
-5. Re-flash · vacío de nuevo · 100 g debe dar ~0.100 kg en LCD.
+- Sacá la tarjeta y volvé a acercarla (tras Halt no relee pegada).  
+- El sketch re-init del RC522 cada ~7 s y después de cada HTTP (WiFi a veces lo duerme).  
+- Serial: `RFID uid=` o `RFID kick … FAIL`.  
+- 3.3V estable; cables cortos SS/SCK/MOSI/MISO/RST.
 
 ### LEDs / full (opcionales)
 
