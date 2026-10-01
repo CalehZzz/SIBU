@@ -39,7 +39,7 @@ python plc_real/plc_bridge_real.py --ip 192.168.0.10
 
 Estación Firestore: `colegio-don-bosco-real`.  
 Hardware: **3 pistones doble efecto** — 6 solenoides Ext/Ret · P1 plástico · P2 latas · P3 vidrio.  
-Semáforo vía relés (`1L`/`2L` = 24 V). HMI de mesa: **web** (plus) — ver `plc_real/TABLA_IO_1214C.md`. Rúbrica: AS + TIA + este físico.
+Salidas `%Q` = transistor **24 V** (DC/DC/DC); lámparas 220 V vía **relés externos**. HMI de mesa: **web** (plus) — ver `plc_real/TABLA_IO_1214C.md` / `plc_real/CPU.md`. Rúbrica: AS + TIA + este físico.
 
 ### Visión Gemini (Raspberry Pi 4) — Costa Rica
 
