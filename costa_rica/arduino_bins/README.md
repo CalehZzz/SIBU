@@ -55,19 +55,64 @@ En el módulo el pin suele decir **SDA** (a veces NSS/SS). Es el **chip-select S
 
 SDA **21** · SCL **22** · addr `0x27`
 
-### HX711
+### HX711 — módulo **Load Cell Amp / Load Cell Amplifier**
 
-DT **26** · SCK **25**
+```
+Load cell (4 hilos) → [ E+ E− A− A+ ] HX711 [ VCC DT SCK GND ] → ESP32
+```
+
+#### Colores de la celda (lo habitual)
+
+| Cable celda | Borne HX711 | Qué es |
+|---|---|---|
+| **Rojo** | **E+** | excitación + |
+| **Negro** | **E−** | excitación − |
+| **Verde** | **A+** | señal + |
+| **Blanco** | **A−** | señal − |
+
+Verde y blanco son la **señal diferencial** (no son VCC/GND). Si `raw` no cambia al cargar, **intercambiá verde ↔ blanco**.
+
+#### ESP sin pin 5V
+
+**No estás regado.** Alimentá el HX711 con **3V3** del ESP (el chip aguanta 2.6–5.5 V). La señal es un poco más débil; calibrá `HX_SCALE` igual.
+
+| Serigrafía HX711 | Va a |
+|---|---|
+| **VCC** | **3V3** (o **VIN**/5V si tu placa lo trae y está alimentada por USB) |
+| **GND** | GND |
+| **DT** / DOUT | GPIO **26** |
+| **SCK** / PD_SCK | GPIO **25** |
+| B+ / B− | no conectar |
+
+### Si `pesoKg` siempre 0.0000
+
+1. Re-flash con `DEBUG_HX = true` (ya viene ON).  
+2. Serial 115200 — buscá `HX raw=` o `HX FAIL`.
+
+| Serial | Qué hacer |
+|---|---|
+| `HX FAIL not ready` | VCC **5V**, DT↔26, SCK↔25, GND; no cruces DT/SCK |
+| `raw=` no cambia al poner peso | Celda mal en E/A; aflojá tornillos / otra celda |
+| `raw=` cambia pero `units≈0` o absurdo | **Calibrá `HX_SCALE`** |
+
+### Calibrar
+
+1. Vacío al boot (hace tare).  
+2. Poné **100 g** conocidos.  
+3. Anotá `units=XXXg` en Serial.  
+4. Nuevo factor: `HX_SCALE = HX_SCALE * units / 100`  
+   Ejemplo: SCALE era 420 y units=850 → `HX_SCALE = 420 * 850 / 100 = 3570`.  
+5. Re-flash · vacío de nuevo · 100 g debe dar ~0.100 kg en LCD.
 
 ### LEDs / full (opcionales)
 
 | Señal | GPIO |
 |---|---|
 | Full plástico | off (`-1`) |
-| Full rechazo | 27 (opcional) |
+| Full rechazo | off |
 | LED amarillo | 4 |
 | LED rojo | **2** (GPIO 5 = SDA/SS del RC522) |
-| LED verde | off (GPIO 15 = RST RFID) |
+| LED verde | off |
 
 ---
 

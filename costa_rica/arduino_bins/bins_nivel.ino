@@ -34,6 +34,7 @@ const int   PI_BINS   = 8082;
 const int   PI_RFID   = 8081;
 
 const bool DEBUG_HC = true;
+const bool DEBUG_HX = true;   // Serial: raw / g / kg — dejalo ON hasta calibrar
 const bool DEMO_NO_STOP = false;
 
 // ===== HC-SR04 =====
@@ -50,11 +51,27 @@ const float MAX_CM = 400.0f;
 const uint8_t LCD_ADDR = 0x27;
 LiquidCrystal_I2C lcd(LCD_ADDR, 16, 2);
 
-// ===== HX711 =====
-const int HX_DT  = 26;
-const int HX_SCK = 25;
+// ===== HX711 — módulo "Load Cell Amplifier" / "Load Cell Amp HX711" =====
+// Cara lógica (al ESP32):
+//   VCC → 3V3  (si tu placa no tiene pin 5V; VIN/5V solo si existe y hay USB)
+//   GND → GND
+//   DT / DOUT → GPIO 26
+//   SCK / PD_SCK → GPIO 25
+// Celda de carga (4 hilos — colores típicos):
+//   ROJO   → E+   (excitación +)
+//   NEGRO  → E−   (excitación −)
+//   BLANCO → A−   (señal −)   ⎫ canal A del HX711
+//   VERDE  → A+   (señal +)   ⎭ si raw no se mueve, intercambiá blanco↔verde
+//   (algunas celdas traen amarillo = shield → GND del HX711)
+// B+ / B− del módulo: no conectar.
+const int HX_DT  = 26;  // DT / DOUT del HX711
+const int HX_SCK = 25;  // SCK / PD_SCK del HX711
+// Calibración (gramos): 1) vacío → tare al boot
+// 2) poné peso conocido (ej. 100 g)  3) mirá Serial "HX raw=…" / "units="
+// 4) HX_SCALE = HX_SCALE * units / 100  si units≠100 con 100 g
 float HX_SCALE = 420.0f;
 HX711 scale;
+bool hxOk = false;
 
 // ===== RC522 (SPI propio — no choca con HC 18/19 ni LCD 21/22) =====
 // En el módulo RC522 el pin se llama SDA / NSS / SS → es el chip-select SPI
@@ -134,7 +151,8 @@ void pintarLcd() {
   lcd.print(l0);
   lcd.setCursor(0, 1);
   char l1[17];
-  if (!sensorOk[1]) snprintf(l1, sizeof(l1), "R:FAIL %5.3fkg", lastKg);
+  if (!sensorOk[1]) snprintf(l1, sizeof(l1), "R:FAIL         ");
+  else if (!hxOk) snprintf(l1, sizeof(l1), "HX?  R:%3d%%   ", lastPct[1]);
   else snprintf(l1, sizeof(l1), "%5.3fkg R:%3d%%  ", lastKg, lastPct[1]);
   lcd.print(l1);
 }
@@ -247,10 +265,24 @@ void tickBins() {
   if (OUT_FULL_P >= 0) digitalWrite(OUT_FULL_P, lleno[0] ? HIGH : LOW);
   if (OUT_FULL_R >= 0) digitalWrite(OUT_FULL_R, lleno[1] ? HIGH : LOW);
 
+  // --- HX711 ---
   if (scale.is_ready()) {
-    float g = scale.get_units(8);
-    if (g < 0) g = 0;
+    hxOk = true;
+    long raw = scale.read();
+    float g = scale.get_units(5);
+    // ruido / tara negativa → 0; no ocultar lecturas chicas reales
+    if (g < -1.0f) g = 0;
+    else if (g < 0) g = 0;
     lastKg = g / 1000.0f;
+    if (DEBUG_HX) {
+      Serial.printf("HX raw=%ld  units=%.1fg  kg=%.4f  SCALE=%.1f\n",
+                    raw, g, lastKg, HX_SCALE);
+    }
+  } else {
+    hxOk = false;
+    if (DEBUG_HX) {
+      Serial.println("HX FAIL not ready — DT→26 SCK→25 VCC→5V GND · ¿cables cruzados DT/SCK?");
+    }
   }
 
   bool stopAll = lleno[1] && !DEMO_NO_STOP;
@@ -269,7 +301,9 @@ void tickBins() {
 
 void setup() {
   Serial.begin(115200);
-  delay(200);
+  delay(800);
+  Serial.println();
+  Serial.println("=== SIBU ESP32 boot ===");
 
   for (int i = 0; i < 2; i++) {
     pinMode(TRIG[i], OUTPUT);
@@ -291,18 +325,58 @@ void setup() {
   lcd.print("HC+HX+RFID");
 
   scale.begin(HX_DT, HX_SCK);
-  scale.set_scale(HX_SCALE);
-  scale.tare(20);
+  delay(200);
+  scale.set_gain(128);  // canal A
+  Serial.print("HX711 wait ready");
+  hxOk = false;
+  for (int i = 0; i < 50; i++) {
+    if (scale.is_ready()) {
+      hxOk = true;
+      break;
+    }
+    Serial.print(".");
+    delay(50);
+  }
+  Serial.println();
+  if (!hxOk) {
+    Serial.println("HX711 FAIL — no responde. VCC 5V, DT=26, SCK=25, GND. Celda E+/E-/A+/A-.");
+    lcd.clear();
+    lcd.print("HX711 FAIL");
+    lcd.setCursor(0, 1);
+    lcd.print("DT26 SCK25 5V");
+  } else {
+    scale.set_scale(HX_SCALE);
+    scale.tare(25);
+    long z = scale.read_average(10);
+    Serial.printf("HX711 OK tare raw≈%ld  SCALE=%.1f (calibrá con peso conocido)\n", z, HX_SCALE);
+    Serial.println("Calibrar: poné 100g → mirá units= → HX_SCALE = HX_SCALE * units / 100");
+  }
+
+  // Soft-reset del RC522 por pin RST antes de SPI
+  pinMode(RFID_RST, OUTPUT);
+  digitalWrite(RFID_RST, LOW);
+  delay(50);
+  digitalWrite(RFID_RST, HIGH);
+  delay(50);
 
   SPI.begin(RFID_SCK, RFID_MISO, RFID_MOSI, RFID_SS);
   mfrc522.PCD_Init();
-  delay(50);
+  delay(80);
   mfrc522.PCD_Init();
+  mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max);
   byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
-  Serial.printf("RC522 version=0x%02X %s\n", v,
-                (v == 0x00 || v == 0xFF) ? "FAIL SPI/3.3V" : "OK");
+  Serial.printf("RC522 version=0x%02X ", v);
+  if (v == 0x00 || v == 0xFF) {
+    Serial.println("FAIL — revisá 3.3V GND SDA=5 SCK=14 MOSI=13 MISO=23 RST=27");
+    lcd.clear();
+    lcd.print("RC522 FAIL");
+    lcd.setCursor(0, 1);
+    lcd.print("cables/3.3V");
+  } else {
+    Serial.println("OK — acercá tarjeta");
+  }
 
-  Serial.println("HC P:18/19  R:33/32 | HX711:26/25 | RFID SDA/SS=5 SCK14 MOSI13 MISO23 RST15");
+  Serial.println("HC P:18/19  R:33/32 | HX711:26/25 | RFID SDA/SS=5 SCK14 MOSI13 MISO23 RST27");
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -315,9 +389,12 @@ void setup() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.print("IP ");
     Serial.println(WiFi.localIP());
+    Serial.printf("Pi bins :%d  rfid :%d  host=%s\n", PI_BINS, PI_RFID, PI_HOST);
+  } else {
+    Serial.println("WiFi FAIL — RFID/bins no van a la Pi hasta que conecte");
   }
 
-  Serial.println("SIBU mesa unificada lista (bins+RFID)");
+  Serial.println("SIBU mesa unificada lista");
 }
 
 void loop() {
