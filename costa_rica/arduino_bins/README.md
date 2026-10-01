@@ -55,16 +55,25 @@ En el módulo el pin suele decir **SDA** (a veces NSS/SS). Es el **chip-select S
 
 SDA **21** · SCL **22** · addr `0x27`
 
-### HX711 (báscula)
+### HX711 — módulo **Load Cell Amp / Load Cell Amplifier**
 
-| HX711 | ESP32 |
+Es el amplificador verde/azul con bornes a un lado y pines al otro. El sketch ya apunta a ese módulo (librería HX711 + canal A).
+
+```
+Load cell (4 hilos) → [ E+ E− A− A+ ] HX711 [ VCC DT SCK GND ] → ESP32
+```
+
+| Serigrafía HX711 | Va a |
 |---|---|
-| VCC | **5 V** (clones suelen fallar en 3V3) |
-| GND | GND |
-| DT / DOUT | **26** |
-| SCK / PD_SCK | **25** |
-
-Celda (típico): E+ rojo · E− negro · A+ verde · A− blanco. Si el raw no cambia al apoyar peso, probá invertír A+/A−.
+| **VCC** | **5V** ESP |
+| **GND** | GND |
+| **DT** o DOUT | GPIO **26** |
+| **SCK** o PD_SCK | GPIO **25** |
+| **E+** | rojo celda |
+| **E−** | negro |
+| **A+** | verde (o blanco; según celda) |
+| **A−** | blanco (o verde) |
+| B+ / B− | no conectar (canal B) |
 
 ### Si `pesoKg` siempre 0.0000
 
