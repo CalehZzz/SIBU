@@ -55,19 +55,46 @@ En el módulo el pin suele decir **SDA** (a veces NSS/SS). Es el **chip-select S
 
 SDA **21** · SCL **22** · addr `0x27`
 
-### HX711
+### HX711 (báscula)
 
-DT **26** · SCK **25**
+| HX711 | ESP32 |
+|---|---|
+| VCC | **5 V** (clones suelen fallar en 3V3) |
+| GND | GND |
+| DT / DOUT | **26** |
+| SCK / PD_SCK | **25** |
+
+Celda (típico): E+ rojo · E− negro · A+ verde · A− blanco. Si el raw no cambia al apoyar peso, probá invertír A+/A−.
+
+### Si `pesoKg` siempre 0.0000
+
+1. Re-flash con `DEBUG_HX = true` (ya viene ON).  
+2. Serial 115200 — buscá `HX raw=` o `HX FAIL`.
+
+| Serial | Qué hacer |
+|---|---|
+| `HX FAIL not ready` | VCC **5V**, DT↔26, SCK↔25, GND; no cruces DT/SCK |
+| `raw=` no cambia al poner peso | Celda mal en E/A; aflojá tornillos / otra celda |
+| `raw=` cambia pero `units≈0` o absurdo | **Calibrá `HX_SCALE`** |
+
+### Calibrar
+
+1. Vacío al boot (hace tare).  
+2. Poné **100 g** conocidos.  
+3. Anotá `units=XXXg` en Serial.  
+4. Nuevo factor: `HX_SCALE = HX_SCALE * units / 100`  
+   Ejemplo: SCALE era 420 y units=850 → `HX_SCALE = 420 * 850 / 100 = 3570`.  
+5. Re-flash · vacío de nuevo · 100 g debe dar ~0.100 kg en LCD.
 
 ### LEDs / full (opcionales)
 
 | Señal | GPIO |
 |---|---|
 | Full plástico | off (`-1`) |
-| Full rechazo | 27 (opcional) |
+| Full rechazo | off |
 | LED amarillo | 4 |
 | LED rojo | **2** (GPIO 5 = SDA/SS del RC522) |
-| LED verde | off (GPIO 15 = RST RFID) |
+| LED verde | off |
 
 ---
 
