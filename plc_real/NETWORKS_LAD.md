@@ -53,13 +53,27 @@ Lámparas:
 
 ## FC_Modos
 
+### NW — Start / Stop / Emergencia / Auto
+
+```
+---| DB_HMI.Start |---|/ DB_HMI.Stop |---|/ DB_HMI.Emergencia |----(S) M_SistemaOn
+
+---| DB_HMI.Stop       |----+----(R) M_SistemaOn
+---| DB_HMI.Emergencia |----+
+
+---| DB_HMI.ModoAuto |----( ) M_ModoAuto
+```
+
+### NW — Lámparas + stop botes
+
 ```
 Q_LamparaAlarma (roja) := Emergencia OR M_Alarma OR I_BinFullRechazo;
 Q_LamparaAmarilla      := NOT I_BinFullRechazo AND (I_BinFullPlastico OR I_BinFullAluminio OR I_BinFullVidrio);
 Q_LamparaRun (verde)   := M_SistemaOn AND NOT Q_LamparaAlarma AND NOT Q_LamparaAmarilla;
+M_StopBotes            := I_BinFullRechazo;
 ```
 
-`M_StopBotes` := `I_BinFullRechazo`
+> **Sin cablear `I_BinFull*`:** no uses DI flotantes. Dejá Merker `M_BinFull* = 0` (o forzá FALSE en TIA) hasta cablear el Arduino. Si `I_BinFullRechazo` queda en 1 → roja ON + banda/manual bloqueados.
 
 ---
 
@@ -137,7 +151,32 @@ M_Clasificando := M_ClasifPlastico OR M_ClasifAluminio OR M_ClasifVidrio;
 
 ### NW8b — Báscula DEMO al final (opcional)
 
-### NW9–11 — Pistón Ext/Ret
+### NW9 — Comando pistón `M_Piston1/2/3` (Auto OR Manual)
+
+```
+---| M_ClasifPlastico |----------------------------------+
+---| M_SistemaOn |---|/ M_ModoAuto |---| ManualPiston1 |--+----( ) M_Piston1
+
+---| M_ClasifAluminio |----------------------------------+
+---| M_SistemaOn |---|/ M_ModoAuto |---| ManualPiston2 |--+----( ) M_Piston2
+
+---| M_ClasifVidrio |------------------------------------+
+---| M_SistemaOn |---|/ M_ModoAuto |---| ManualPiston  |--+----( ) M_Piston3
+```
+
+| Pistón | Auto | Manual (`DB_HMI`) |
+|---|---|---|
+| P1 | `M_ClasifPlastico` | `ManualPiston1` @ 1.4 |
+| P2 | `M_ClasifAluminio` | `ManualPiston2` @ 1.5 |
+| P3 | `M_ClasifVidrio` | `ManualPiston` @ 0.7 |
+
+### NW10–11 — Solenoides Ext/Ret (por pistón)
+
+```
+---| M_SistemaOn |---| M_PistonN |---|/ Q_PistonNRet |----( ) Q_PistonNExt
+---| M_SistemaOn |---|/ M_PistonN |---|/ Q_PistonNExt |----( ) Q_PistonNRet
+```
+
 ### NW12–14 — TON → pulso contador FÍSICO + Vision:=0 (solo clasif real)
 
 ---

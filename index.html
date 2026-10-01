@@ -761,6 +761,14 @@
   .sp-header-right{
     text-align: right; font-family: 'Share Tech Mono', monospace;
     font-size: 10px; line-height: 1.25; white-space: nowrap;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+  }
+  .sp-estacion-badge{
+    font-size: 10px; font-weight: 700; color: #9ad0ff;
+    max-width: 240px; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sp-cmd-ack{
+    font-size: 10px; color: #8fd99a;
   }
   .sp-alarm{
     min-height: 22px;
@@ -1542,6 +1550,8 @@
                   <div class="sp-header-right">
                     <div id="hmi-clock">--:--:--</div>
                     <div id="hmi-link-text">Sin datos</div>
+                    <div id="hmi-estacion-badge" class="sp-estacion-badge">—</div>
+                    <div id="hmi-cmd-ack" class="sp-cmd-ack">—</div>
                   </div>
                 </div>
 
@@ -2035,13 +2045,13 @@ let sesion = null;        // sesión de pesaje activa
 let unsubSesion = null;    // función para dejar de escuchar la sesión en Firestore
 
 const FALLBACK_ESTACIONES = [
-  { id: "parque-central",  nombre: "Colegio Don Bosco", zona: "DEMO · PLCSIM · P1 plástico · P2 latas · P3 vidrio", activa: true },
-  { id: "colegio-don-bosco-real", nombre: "Colegio Don Bosco · PLC real", zona: "CPU 1214C · 6Q pistones + relés", activa: true }
+  { id: "colegio-don-bosco-real", nombre: "Colegio Don Bosco · PLC real", zona: "CPU 1214C · mesa física · usá ESTA", activa: true },
+  { id: "parque-central",  nombre: "DEMO · PLCSIM (PC)", zona: "Solo simulación 1511C · no es la mesa", activa: true }
 ];
 
 const HMI_ESTACION_DEMO = "parque-central";
 const HMI_ESTACION_REAL = "colegio-don-bosco-real";
-let HMI_ESTACION_ID = HMI_ESTACION_DEMO;
+let HMI_ESTACION_ID = HMI_ESTACION_REAL;
 let hmiModeReal = false;
 const HMI_CMD_DEFAULT = {
   Start: false,
@@ -2180,11 +2190,17 @@ function flushHmiCmd(){
     clearTimeout(hmiFlushTimer);
     hmiFlushTimer = null;
   }
+  const dest = HMI_ESTACION_ID;
   return setDoc(hmiCmdRef(), {
     ...hmiCmd,
     actualizado: serverTimestamp()
-  }, { merge: true }).catch((e) => {
+  }, { merge: true }).then(() => {
+    if($("hmi-cmd-ack")){
+      $("hmi-cmd-ack").textContent = "OK → " + dest;
+    }
+  }).catch((e) => {
     console.error(e);
+    if($("hmi-cmd-ack")) $("hmi-cmd-ack").textContent = "ERROR Firestore";
     toast("⚠️ No se pudo enviar comando HMI (Firestore).");
   });
 }
@@ -2202,15 +2218,16 @@ function pushHmiCmd(patch, opts){
 }
 
 /**
- * Pulsos Start/Stop/Reset: deben vivir > intervalo del bridge (~0.35s)
- * + latencia Firestore. Si no, el PLC a veces nunca ve el flanco.
+ * Pulsos Start/Stop/Reset: deben vivir > intervalo del bridge + latencia Firestore.
+ * Bridge ahora usa on_snapshot; igual dejamos 2s por si hay lag.
  */
-function pulseHmi(flag, ms = 1000){
+function pulseHmi(flag, ms = 2000){
   if(hmiPulseTimers[flag]) clearTimeout(hmiPulseTimers[flag]);
   // Mutuamente excluyentes: Start y Stop no pueden quedar 1 a la vez
   if(flag === "Start") hmiCmd.Stop = false;
   if(flag === "Stop") hmiCmd.Start = false;
   pushHmiCmd({ [flag]: true }, { immediate: true });
+  toast(flag + " → " + HMI_ESTACION_ID, { soft: true });
   hmiPulseTimers[flag] = setTimeout(() => {
     pushHmiCmd({ [flag]: false }, { immediate: true });
     delete hmiPulseTimers[flag];
@@ -2343,12 +2360,12 @@ function applyHmiStationMode(real, estacionId){
 }
 
 function openHmiForStation(estacionId){
-  const id = estacionId || (sesion && sesion.estacionId) || HMI_ESTACION_DEMO;
+  const id = estacionId || (sesion && sesion.estacionId) || HMI_ESTACION_REAL;
   const real = id === HMI_ESTACION_REAL;
   applyHmiStationMode(real, id);
   showAppView("hmi");
   ensureHmiListen();
-  toast("HMI · " + id);
+  toast("HMI → hmi_comandos/" + id);
 }
 
 document.querySelectorAll(".navpills .pill[data-view]").forEach(btn => {
@@ -2991,12 +3008,29 @@ function syncRealPistonCmdUi(plc){
   $("hmi-banda-off")?.classList.toggle("active-cmd", !plc.banda);
 }
 
+/** Manual/banda/pistón en LAD exigen M_SistemaOn y /ModoAuto. */
+function ensureSistemaOnForActuators(){
+  if(hmiCmd.Emergencia){
+    pushHmiCmd({ Emergencia: false }, { immediate: true });
+    toast("Quité emergencia", { soft: true });
+  }
+  const sist = ($("hmi-sistema")?.textContent || "").toUpperCase();
+  if(sist === "OFF" || sist === "—"){
+    pulseHmi("Start", 1200);
+    toast("START (hace falta para luces/actuadores)", { soft: true });
+    return false;
+  }
+  return true;
+}
+
 function setPistonExtend(which, extend){
+  if(extend) ensureSistemaOnForActuators();
   const patch = { ModoAuto: false };
   if(which === 1) patch.ManualPiston1 = !!extend;
   else if(which === 2) patch.ManualPiston2 = !!extend;
   else patch.ManualPiston = !!extend; // P3 vidrio
   pushHmiCmd(patch);
+  toast((extend ? "P" + which + " OUT" : "P" + which + " IN") + " → " + HMI_ESTACION_ID, { soft: true });
   syncHmiToggleUi();
   // UI inmediata (no esperar Firestore ni PLC)
   syncRealPistonCmdUi({
@@ -3007,18 +3041,12 @@ function setPistonExtend(which, extend){
   });
   if($("hmi-p" + which)) $("hmi-p" + which).textContent = pistonPosLabel(!!extend);
   $("hmi-chip-p" + which)?.classList.toggle("ok", !!extend);
-
-  // Solo aviso suave si hace falta START (manual suele exigir SistemaOn)
-  if(extend){
-    const sist = ($("hmi-sistema")?.textContent || "").toUpperCase();
-    if(sist === "OFF" || sist === "—"){
-      toast("Dale START si no se mueve", { soft: true });
-    }
-  }
 }
 
 function setBandaManual(on){
+  if(on) ensureSistemaOnForActuators();
   pushHmiCmd({ ModoAuto: false, ManualBanda: !!on });
+  toast((on ? "Banda ON" : "Banda OFF") + " → " + HMI_ESTACION_ID, { soft: true });
   syncHmiToggleUi();
   syncRealPistonCmdUi({
     banda: !!on,
@@ -3045,13 +3073,18 @@ function renderHmiFromPlc(data){
     bar.classList.remove("ok", "warn", "fault");
     if(plc.emergencia){
       bar.classList.add("fault");
-      if(alarmTxt) alarmTxt.textContent = "EMERGENCIA ACTIVA — máquina detenida";
+      if(alarmTxt) alarmTxt.textContent = "EMERGENCIA — pulsá Quit. E y luego START";
     }else if(plc.alarma){
       bar.classList.add("warn");
-      if(alarmTxt) alarmTxt.textContent = "ALARMA ACTIVA — reset requerido";
+      if(alarmTxt) alarmTxt.textContent = "ALARMA ACTIVA — Reset (¿bote rechazo lleno?)";
+    }else if(connected && !plc.sistemaOn){
+      bar.classList.add("warn");
+      if(alarmTxt) alarmTxt.textContent = "Sistema OFF — pulsá START (luego Manual + banda/P1)";
     }else if(connected){
       bar.classList.add("ok");
-      if(alarmTxt) alarmTxt.textContent = "Sistema listo — sin alarmas";
+      if(alarmTxt) alarmTxt.textContent = plc.modoAuto
+        ? "AUTO listo — banda debería correr si no hay alarma"
+        : "MANUAL — usá Marcha / Extender para Q del PLC";
     }else{
       bar.classList.add("ok");
       if(alarmTxt) alarmTxt.textContent = "Sin enlace PLC / bridge";
@@ -3082,8 +3115,10 @@ function renderHmiFromPlc(data){
 
 function ensureHmiListen(){
   applyHmiStationMode(hmiModeReal, HMI_ESTACION_ID);
-  if($("hmi-estacion-id")) $("hmi-estacion-id").textContent = HMI_ESTACION_ID + (hmiModeReal ? " · REAL 1214C" : " · DEMO 1511C");
-  if($("hmi-estacion-id-real")) $("hmi-estacion-id-real").textContent = HMI_ESTACION_ID + (hmiModeReal ? " · REAL 1214C" : " · DEMO sim");
+  const label = HMI_ESTACION_ID + (hmiModeReal ? " · REAL 1214C" : " · DEMO 1511C");
+  if($("hmi-estacion-id")) $("hmi-estacion-id").textContent = label;
+  if($("hmi-estacion-id-real")) $("hmi-estacion-id-real").textContent = label;
+  if($("hmi-estacion-badge")) $("hmi-estacion-badge").textContent = label;
   $("hmi-chip-p1")?.classList.remove("hidden");
   $("hmi-chip-p2")?.classList.remove("hidden");
   $("hmi-chip-p3")?.classList.remove("hidden");
@@ -3100,12 +3135,13 @@ function ensureHmiListen(){
 }
 
 $("hmi-start").onclick = () => {
-  pulseHmi("Start", 1000);
-  toast("START", { soft: true });
+  if(hmiCmd.Emergencia){
+    pushHmiCmd({ Emergencia: false }, { immediate: true });
+  }
+  pulseHmi("Start", 2000);
 };
 $("hmi-stop").onclick = () => {
-  pulseHmi("Stop", 1000);
-  toast("STOP", { soft: true });
+  pulseHmi("Stop", 2000);
 };
 $("hmi-emergencia").onclick = () => pushHmiCmd({ Emergencia: true }, { immediate: true });
 $("hmi-clear-e").onclick = () => pushHmiCmd({ Emergencia: false }, { immediate: true });
